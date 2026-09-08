@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>السحوبات</title>
+<style>
+body{
+    font-family:Arial;
+    background:#0f172a;
+    color:white;
+    padding:30px;
+}
+input,select{
+    width:100%;
+    padding:10px;
+    margin:6px 0;
+}
+button{
+    padding:12px;
+    width:100%;
+    background:#5865F2;
+    color:white;
+    border:none;
+    cursor:pointer;
+}
+table{
+    width:100%;
+    margin-top:25px;
+    border-collapse:collapse;
+}
+td,th{
+    border:1px solid #444;
+    padding:10px;
+    text-align:center;
+}
+</style>
+</head>
+<body>
+
+<h1>🎁 إدارة السحوبات</h1>
+
+<form method="POST">
+
+<input name="name" placeholder="اسم السحب" required>
+
+<input name="prize" placeholder="الجائزة" required>
+
+<input
+type="number"
+name="winners_count"
+placeholder="عدد الفائزين"
+required>
+
+<select name="type">
+<option value="forced">إجباري</option>
+<option value="optional">اختياري</option>
+<option value="paid">اختياري برسوم</option>
+</select>
+
+<input
+type="number"
+name="entry_fee"
+value="0"
+placeholder="رسوم الاشتراك">
+
+<input
+name="role_id"
+placeholder="Role ID">
+
+<input
+name="channel_id"
+placeholder="Channel ID"
+required>
+
+<input
+type="datetime-local"
+name="run_at"
+required>
+
+<button>إنشاء السحب</button>
+
+</form>
+
+<hr>
+
+<h2>السحوبات الحالية</h2>
+
+<table>
+
+<tr>
+<th>ID</th>
+<th>الاسم</th>
+<th>الجائزة</th>
+<th>الحالة</th>\n<th>الفائزون</th>
+<th>إجراءات</th>
+</tr>
+
+<% giveaways.forEach(g=>{ %>
+
+<tr>
+
+<td><%= g.id %></td>
+
+<td><%= g.name %></td>
+
+<td><%= g.prize %></td>
+
+<td><%= g.status %></td>
+
+<td>
+<%
+let gw = winners.filter(w=>w.giveaway_id === g.id);
+%>
+
+<% if(gw.length){ %>
+<%= gw.map(w=>`<@${w.user_id}>`).join(", ") %>
+<% } else { %>
+لا يوجد
+<% } %>
+
+</td>
+
+<td>
+<a href="/dashboard/<%= guildId %>/giveaways/delete/<%= g.id %>">
+<button type="button">🗑️ حذف</button>
+</a>
+
+<br>
+
+<a href="/dashboard/<%= guildId %>/giveaways/edit/<%= g.id %>">
+<button type="button">✏️ تعديل</button>
+</a>
+</td>
+
+
+</tr>
+
+<% }) %>
+
+</table>
+
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>Nexora Dashboard</title>
+</head>
+
+<body>
+
+<h1>⚙️ إعدادات النقاط</h1>
+
+<form method="POST">
+
+<h2>📝 الرسائل</h2>
+
+<label>تفعيل نقاط الرسائل:</label>
+<select name="text_enabled">
+<option value="1" <%= settings.text_enabled == 1 ? "selected" : "" %>>مفعل</option>
+<option value="0" <%= settings.text_enabled == 0 ? "selected" : "" %>>متوقف</option>
+</select>
+
+<br><br>
+
+<label>نقاط الرسالة:</label>
+<input name="text_points" value="<%= settings.text_points %>">
+
+<br><br>
+
+<label>أقل طول للرسالة:</label>
+<input name="min_message_length" value="<%= settings.min_message_length %>">
+
+<br><br>
+
+<label>عدد الرسائل للحصول على النقاط:</label>
+<input name="messages_required" value="<%= settings.messages_required || 1 %>">
+
+
+<hr>
+
+<h2>🎙️ الصوت</h2>
+
+<label>تفعيل نقاط الصوت:</label>
+<select name="voice_enabled">
+<option value="1" <%= settings.voice_enabled == 1 ? "selected" : "" %>>مفعل</option>
+<option value="0" <%= settings.voice_enabled == 0 ? "selected" : "" %>>متوقف</option>
+</select>
+
+<br><br>
+
+<label>نقاط الصوت:</label>
+<input name="voice_points" value="<%= settings.voice_points %>">
+
+<br><br>
+
+<label>كل كم دقيقة يعطي نقاط:</label>
+<input name="voice_interval" value="<%= settings.voice_interval %>">
+
+
+<br><br>
+
+<button type="submit">💾 حفظ</button>
+
+</form>
+
+</body>
+</html>

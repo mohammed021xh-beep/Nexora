@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexora Shop</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #111827;
+  color: #fff;
+  padding: 25px;
+}
+
+h1, h2 {
+  margin-bottom: 20px;
+}
+
+form {
+  background: #1f2937;
+  padding: 20px;
+  border-radius: 12px;
+  max-width: 600px;
+}
+
+label {
+  display: block;
+  margin-bottom: 7px;
+  font-weight: bold;
+}
+
+input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  background: #111827;
+  color: white;
+}
+
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  background: #111827;
+  color: white;
+  resize: vertical;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 15px;
+}
+
+.checkbox input {
+  width: auto;
+  margin: 0;
+}
+
+button {
+  padding: 11px 18px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.add-btn {
+  background: #22c55e;
+  color: white;
+}
+
+.product {
+  background: #1f2937;
+  padding: 18px;
+  border-radius: 12px;
+  margin: 15px 0;
+  max-width: 600px;
+}
+
+.product-name {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.price {
+  margin-top: 8px;
+}
+
+.description {
+  margin-top: 10px;
+  color: #d1d5db;
+}
+
+.stock {
+  margin-top: 8px;
+  color: #9ca3af;
+}
+</style>
+</head>
+
+<body>
+
+<h1>🛒 إدارة المتجر</h1>
+
+<form method="POST">
+
+<label>اسم المنتج</label>
+<input
+  name="name"
+  placeholder="مثال: 30UC"
+  required
+>
+
+<label>السعر بالنقاط 🪙</label>
+<input
+  name="price"
+  type="number"
+  min="0"
+  placeholder="40"
+  required
+>
+
+<label>الكمية</label>
+<input
+  name="stock"
+  type="number"
+  value="-1"
+  placeholder="-1 = غير محدود"
+>
+
+<label>وصف المنتج</label>
+<textarea
+  name="description"
+  rows="4"
+  placeholder="اكتب تفاصيل المنتج هنا..."
+></textarea>
+
+<label class="checkbox">
+  <input
+    type="checkbox"
+    name="requires_input"
+    value="1"
+  >
+  يحتاج معلومات من العضو عند الشراء
+</label>
+
+<label>اسم المعلومات المطلوبة</label>
+<input
+  name="input_name"
+  placeholder="مثال: PUBG ID أو Discord ID"
+>
+
+<button class="add-btn" type="submit">
+  ➕ إضافة المنتج
+</button>
+
+</form>
+
+<hr>
+
+<h2>📦 المنتجات الحالية</h2>
+
+<% if (!items || items.length === 0) { %>
+
+<p>🛒 لا توجد منتجات حالياً.</p>
+
+<% } else { %>
+
+<% items.forEach(item => { %>
+
+<div class="product">
+
+  <div class="product-name">
+    📦 <%= item.name %>
+  </div>
+
+  <div class="price">
+    💰 السعر: <strong><%= item.price %> 🪙</strong>
+  </div>
+
+  <div class="stock">
+    📊 الكمية:
+    <%= item.stock === -1 ? "غير محدودة" : item.stock %>
+  </div>
+
+  <% if (item.description) { %>
+  <div class="description">
+    📝 <%= item.description %>
+  </div>
+  <% } %>
+
+  <% if (item.requires_input) { %>
+  <div class="description">
+    🏷️ المعلومات المطلوبة:
+    <%= item.input_name || "معلومات من العضو" %>
+  </div>
+  <% } %>
+
+</div>
+
+<% }) %>
+
+<% } %>
+
+</body>
+</html>

@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nexora</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b0f19;color:#e8ecf5;font-family:Arial,sans-serif}
+.container{max-width:1200px;margin:auto;padding:20px}
+.header{background:#121827;border:1px solid #202a3d;border-radius:18px;padding:20px;margin-bottom:20px}
+.header h1{margin:0 0 6px;font-size:25px}
+.muted{color:#8d98ad}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.card{background:#121827;border:1px solid #202a3d;border-radius:16px;padding:18px}
+.card h2{margin-top:0;font-size:19px}
+label{display:block;margin:12px 0 6px;color:#aeb8ca}
+input,select{width:100%;padding:11px;border-radius:10px;border:1px solid #303b52;background:#0d1320;color:#fff}
+button{border:0;border-radius:10px;padding:11px 16px;background:#5865f2;color:white;cursor:pointer;font-weight:bold}
+button:hover{opacity:.9}
+.save{margin-top:18px;width:100%;font-size:16px}
+.toggle{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.toggle input{width:auto}
+.item,.giveaway{border-top:1px solid #252e40;padding:14px 0}
+.badge{display:inline-block;padding:5px 9px;border-radius:20px;background:#202a40;color:#b9c5ff;font-size:12px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+a{color:#9da8ff;text-decoration:none}
+hr{border:0;border-top:1px solid #202a3d;margin:20px 0}
+
+.server-selector{
+  position:relative;
+  display:inline-block;
+  margin-top:8px;
+}
+
+.server-selector-btn{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  min-width:220px;
+  padding:10px 14px;
+  border:1px solid #293451;
+  border-radius:12px;
+  background:#151c2e;
+  color:#fff;
+  cursor:pointer;
+  font-size:15px;
+  text-align:right;
+}
+
+.server-selector-btn:hover{
+  background:#1b243a;
+}
+
+.server-arrow{
+  font-size:11px;
+  opacity:.8;
+  margin-right:auto;
+}
+
+.server-menu{
+  display:none;
+  position:absolute;
+  top:calc(100% + 8px);
+  right:0;
+  width:300px;
+  max-height:360px;
+  overflow-y:auto;
+  padding:8px;
+  background:#111827;
+  border:1px solid #293451;
+  border-radius:14px;
+  box-shadow:0 15px 40px rgba(0,0,0,.45);
+  z-index:9999;
+}
+
+.server-menu.show{
+  display:block;
+}
+
+.server-option{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  padding:10px;
+  margin-bottom:4px;
+  border-radius:10px;
+  color:#fff;
+  background:transparent;
+}
+
+.server-option:last-child{
+  margin-bottom:0;
+}
+
+.server-option:hover{
+  background:#1d2740;
+}
+
+.server-option img{
+  width:38px;
+  height:38px;
+  border-radius:10px;
+  object-fit:cover;
+  flex-shrink:0;
+}
+
+.server-option span:nth-child(2){
+  flex:1;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.server-add,
+.server-open,
+.server-view{
+  font-size:11px;
+  white-space:nowrap;
+  opacity:.9;
+}
+
+.server-add{
+  color:#7ee787;
+}
+
+.server-open{
+  color:#9da8ff;
+}
+
+.server-view{
+  color:#f0c674;
+}
+
+@media (max-width:600px){
+  .server-selector{
+    width:100%;
+  }
+
+  .server-selector-btn{
+    min-width:0;
+  }
+
+  .server-menu{
+    width:100%;
+    max-width:100%;
+  }
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+
+
+
+<div class="header">
+<h1 class="nexora-title">
+  <img
+    src="https://i.ibb.co/21NMDT7Z/nexora.png"
+    alt="Nexora"
+    style="width:42px;height:42px;object-fit:cover;border-radius:10px;vertical-align:middle;margin-left:10px;"
+  >
+  <span>Nexora</span>
+</h1>
+
+
+
+
+
+
+<div class="server-selector">
+  <%
+    const currentServer =
+      (manageableGuilds || []).find(server => server.id === guildId);
+  %>
+
+  <button type="button" class="server-selector-btn" onclick="toggleServerMenu()">
+    <span>
+      <%= currentServer ? currentServer.name : "اختيار السيرفر" %>
+    </span>
+    <span class="server-arrow">▼</span>
+  </button>
+
+  <div id="serverMenu" class="server-menu">
+    <% (manageableGuilds || []).forEach(server => { %>
+      <a
+        href="<%= server.botInstalled ? '/dashboard/' + server.id : 'https://discord.com/oauth2/authorize?client_id=' + clientId + '&scope=bot%20applications.commands&permissions=8&guild_id=' + server.id %>"
+        class="server-option"
+      >
+        <img src="<%= server.icon %>" alt="">
+        <span><%= server.name %></span>
+
+        <% if (!server.botInstalled) { %>
+          <span class="server-add">➕ إضافة البوت</span>
+        <% } else if (server.canEdit) { %>
+          <span class="server-open">فتح</span>
+        <% } else { %>
+          <span class="server-view">👁️ عرض</span>
+        <% } %>
+      </a>
+    <% }) %>
+  </div>
+</div>
+
+<script>
+function toggleServerMenu() {
+  const menu = document.getElementById("serverMenu");
+  if (!menu) return;
+
+  menu.classList.toggle("show");
+}
+
+document.addEventListener("click", function(event) {
+  const selector = document.querySelector(".server-selector");
+
+  if (selector && !selector.contains(event.target)) {
+    const menu = document.getElementById("serverMenu");
+
+    if (menu) {
+      menu.classList.remove("show");
+    }
+  }
+});
+</script>
+</div>
+
+<form method="POST" action="/dashboard/<%= guildId %>">
+
+<div class="grid">
+
+<div class="card">
+<h2>📝 نقاط الرسائل</h2>
+
+<label class="toggle">
+<input type="checkbox" name="text_enabled" value="1"
+<%= settings.text_enabled == 1 ? "checked" : "" %>>
+تفعيل نقاط الرسائل
+</label>
+
+<label>نقاط الرسالة</label>
+<input type="number" name="text_points" value="<%= settings.text_points %>">
+
+<label>عدد الرسائل للحصول على النقاط</label>
+<input type="number" name="messages_required" value="<%= settings.messages_required || 1 %>">
+
+<label>أقل طول للرسالة</label>
+<input type="number" name="min_message_length" value="<%= settings.min_message_length %>">
+</div>
+
+<div class="card">
+<h2>🎙️ نقاط الصوت</h2>
+
+<label class="toggle">
+<input type="checkbox" name="voice_enabled" value="1"
+<%= settings.voice_enabled == 1 ? "checked" : "" %>>
+تفعيل نقاط الصوت
+</label>
+
+<label>نقاط الصوت</label>
+<input type="number" name="voice_points" value="<%= settings.voice_points %>">
+
+<label>كل كم دقيقة</label>
+<input type="number" name="voice_interval" value="<%= settings.voice_interval %>">
+</div>
+
+<div class="card">
+<h2>⚙️ إعدادات عامة</h2>
+
+<label>📢 قناة الطلبات</label>
+<select name="purchase_channel">
+<option value="">بدون قناة</option>
+<% (channels || []).forEach(channel => { %>
+<option value="<%= channel.id %>"
+<%= settings.purchase_channel == channel.id ? "selected" : "" %>>
+# <%= channel.name %>
+</option>
+<% }) %>
+</select>
+
+<label>📋 قناة اللوغ</label>
+<select name="log_channel">
+<option value="">بدون قناة</option>
+<% (channels || []).forEach(channel => { %>
+<option value="<%= channel.id %>"
+<%= settings.log_channel == channel.id ? "selected" : "" %>>
+# <%= channel.name %>
+</option>
+<% }) %>
+</select>
+
+<button class="save" type="submit">💾 حفظ الإعدادات</button>
+</div>
+
+<div class="card" style="margin-top:12px;">
+  <a
+    href="/dashboard/<%= guildId %>/commands"
+    style="
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      width:100%;
+      box-sizing:border-box;
+      padding:14px 18px;
+      border-radius:10px;
+      background:#5865f2;
+      color:#fff;
+      text-decoration:none;
+      font-size:16px;
+      font-weight:700;
+    "
+  >
+    ⚡ إدارة الأوامر
+  </a>
+</div>
+
+</div>
+</form>
+
+<hr>
+
+<div class="grid">
+
+<div class="card">
+<h2>🛒 إضافة منتج</h2>
+
+<form method="POST" action="/dashboard/<%= guildId %>/shop">
+
+<label>اسم المنتج</label>
+<input name="name" required>
+
+<label>السعر</label>
+<input name="price" type="number" required>
+
+<label>الكمية</label>
+<input name="stock" type="number" value="-1">
+
+<label>النوع</label>
+<select name="type">
+<option value="role">رتبة</option>
+<option value="text">مخصص</option>
+</select>
+
+<label>رتبة الشراء المطلوبة</label>
+<select name="required_role_id">
+<option value="">بدون رتبة</option>
+<% (roles || []).forEach(role => { %>
+<option value="<%= role.id %>"><%= role.name %></option>
+<% }) %>
+</select>
+
+<label class="toggle">
+<input type="checkbox" name="requires_input" value="1">
+يحتاج معلومات من العضو
+</label>
+
+<label>اسم المعلومات المطلوبة</label>
+<input name="input_name" placeholder="مثال: PUBG ID">
+
+<br><br>
+<button type="submit">➕ إضافة المنتج</button>
+</form>
+</div>
+
+<div class="card">
+<h2>📦 المنتجات</h2>
+
+<% if(items && items.length){ %>
+<% items.forEach(item=>{ %>
+
+<div class="item">
+<b>🛒 <%= item.name %></b>
+<br>
+<span class="badge">💰 <%= item.price %> 🪙</span>
+<span class="badge">🎁 <%= item.type %></span>
+
+<div class="actions">
+<a href="/dashboard/<%= guildId %>/shop/delete/<%= item.id %>">🗑️ حذف</a>
+</div>
+
+<details id="edit-shop-<%= item.id %>" style="margin-top:15px;">
+<summary>✏️ تعديل المنتج</summary>
+
+<form method="POST" action="/dashboard/<%= guildId %>/shop/edit/<%= item.id %>">
+
+<label>اسم المنتج</label>
+<input name="name" value="<%= item.name %>" required>
+
+<label>السعر</label>
+<input name="price" type="number" value="<%= item.price %>" required>
+
+<label>الكمية</label>
+<input name="stock" type="number" value="<%= item.stock ?? -1 %>">
+
+<label>النوع</label>
+<select name="type">
+<option value="role" <%= item.type === "role" ? "selected" : "" %>>رتبة</option>
+<option value="text" <%= item.type === "text" ? "selected" : "" %>>مخصص</option>
+</select>
+
+<label>رتبة الشراء المطلوبة</label>
+<select name="required_role_id">
+<option value="">بدون رتبة</option>
+<% (roles || []).forEach(role => { %>
+<option value="<%= role.id %>" <%= item.required_role_id === role.id ? "selected" : "" %>>
+<%= role.name %>
+</option>
+<% }) %>
+</select>
+
+<label class="toggle">
+<input
+  type="checkbox"
+  name="requires_input"
+  value="1"
+  <%= item.requires_input ? "checked" : "" %>
+>
+يحتاج معلومات من العضو
+</label>
+
+<label>اسم المعلومات المطلوبة</label>
+<input
+  name="input_name"
+  value="<%= item.input_name || '' %>"
+  placeholder="مثال: PUBG ID"
+>
+
+<br><br>
+
+<button type="submit">💾 حفظ التعديل</button>
+
+</form>
+</details>
+</div>
+
+<% }) %>
+<% } else { %>
+<div class="muted">لا توجد منتجات حاليًا.</div>
+<% } %>
+
+</div>
+
+</div>
+
+<hr>
+
+<div class="card">
+<h2>🎁 إنشاء سحب</h2>
+
+<form method="POST" action="/dashboard/<%= guildId %>/giveaways">
+
+<div class="grid">
+
+<div>
+<label>اسم السحب</label>
+<input name="name" required>
+</div>
+
+<div>
+<label>الجائزة</label>
+<input name="prize" required>
+</div>
+
+<div>
+<label>عدد الفائزين</label>
+<input type="number" name="winners_count" value="1">
+</div>
+
+<div>
+<label>نوع السحب</label>
+<select name="type">
+<option value="forced">إجباري</option>
+<option value="optional">اختياري</option>
+<option value="paid">اختياري برسوم</option>
+</select>
+</div>
+
+<div>
+<label>رسوم الاشتراك</label>
+<input type="number" name="entry_fee" value="0">
+</div>
+
+<div>
+<label>🎭 رتبة السحب</label>
+<select name="role_id">
+<option value="">بدون رتبة</option>
+<% (roles || []).forEach(role => { %>
+<option value="<%= role.id %>"><%= role.name %></option>
+<% }) %>
+</select>
+</div>
+
+<div>
+<label>📢 قناة السحب</label>
+<select name="channel_id">
+<option value="">بدون قناة</option>
+<% (channels || []).forEach(channel => { %>
+<option value="<%= channel.id %>"># <%= channel.name %></option>
+<% }) %>
+</select>
+</div>
+
+<div>
+<label>موعد السحب</label>
+<input type="datetime-local" name="run_at">
+</div>
+
+</div>
+
+<br>
+<button type="submit" id="createGiveawayBtn">🎁 إنشاء السحب</button>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.querySelector('form[action*="/giveaways"]');
+  const button = document.getElementById("createGiveawayBtn");
+
+  if (!form || !button) return;
+
+  form.addEventListener("submit", () => {
+    if (button.disabled) return;
+
+    button.disabled = true;
+    button.textContent = "⏳ جاري إنشاء السحب...";
+  });
+});
+</script>
+</form>
+</div>
+
+<hr>
+
+<div class="card">
+<h2>📋 السحوبات</h2>
+
+<% if(giveaways && giveaways.length){ %>
+
+<% giveaways.forEach(g=>{ %>
+
+<div class="giveaway">
+<b>🎁 <%= g.name %></b>
+<br>
+<span class="badge">🏆 <%= g.prize %></span>
+<span class="badge">👥 <%= g.winners_count %> فائز</span>
+<span class="badge">📌 <%= g.status %></span>
+
+<br><br>
+
+المشاركون:
+<%= entries.filter(e=>e.giveaway_id===g.id).length %>
+
+<br>
+
+الفائزون:
+<%
+let gw=winners.filter(w=>w.giveaway_id===g.id);
+%>
+
+<% if(gw.length){ %>
+<%= gw.map(w=>`<@${w.user_id}>`).join(", ") %>
+<% }else{ %>
+<span class="muted">لا يوجد</span>
+<% } %>
+
+<div class="actions">
+<a href="/dashboard/<%= guildId %>/giveaways/delete/<%= g.id %>">🗑️ حذف</a>
+<a href="/dashboard/<%= guildId %>/giveaways/reroll/<%= g.id %>">🔄 إعادة سحب</a>
+</div>
+
+<details id="edit-giveaway-<%= g.id %>" style="margin-top:15px;">
+<summary>✏️ تعديل السحب</summary>
+
+<form method="POST" action="/dashboard/<%= guildId %>/giveaways/edit/<%= g.id %>">
+
+<label>اسم السحب</label>
+<input name="name" value="<%= g.name %>" required>
+
+<label>الجائزة</label>
+<input name="prize" value="<%= g.prize %>" required>
+
+<label>عدد الفائزين</label>
+<input type="number" name="winners_count" value="<%= g.winners_count %>" min="1" required>
+
+<label>نوع السحب</label>
+<select name="type">
+<option value="forced" <%= g.type === "forced" ? "selected" : "" %>>إجباري</option>
+<option value="optional" <%= g.type === "optional" ? "selected" : "" %>>اختياري</option>
+<option value="paid" <%= g.type === "paid" ? "selected" : "" %>>اختياري برسوم</option>
+</select>
+
+<label>رسوم الاشتراك</label>
+<input type="number" name="entry_fee" value="<%= g.entry_fee || 0 %>" min="0">
+
+<label>🎭 رتبة السحب</label>
+<select name="role_id">
+<option value="">بدون رتبة</option>
+<% (roles || []).forEach(role => { %>
+<option value="<%= role.id %>" <%= g.role_id === role.id ? "selected" : "" %>>
+<%= role.name %>
+</option>
+<% }) %>
+</select>
+
+<label>📢 قناة السحب</label>
+<select name="channel_id">
+<option value="">بدون قناة</option>
+<% (channels || []).forEach(channel => { %>
+<option value="<%= channel.id %>" <%= g.channel_id === channel.id ? "selected" : "" %>>
+# <%= channel.name %>
+</option>
+<% }) %>
+</select>
+
+<label>موعد السحب</label>
+<%
+let runAtValue = "";
+if (g.run_at) {
+  const runAtDate = new Date(g.run_at);
+  if (!isNaN(runAtDate.getTime())) {
+    runAtValue = runAtDate.toISOString().slice(0, 16);
+  }
+}
+%>
+<input type="datetime-local" name="run_at" value="<%= runAtValue %>">
+
+<br><br>
+
+<button type="submit">💾 حفظ التعديل</button>
+
+</form>
+</details>
+
+</div>
+
+<% }) %>
+
+<% }else{ %>
+<div class="muted">لا توجد سحوبات حاليًا.</div>
+<% } %>
+
+</div>
+
+</div>
+</body>
+</html>

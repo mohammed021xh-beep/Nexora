@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Nexora • إدارة الأوامر</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  background:#0b0f17;
+  color:#fff;
+  font-family:Arial,sans-serif;
+}
+
+.container{
+  max-width:950px;
+  margin:35px auto;
+  padding:20px;
+}
+
+.back{
+  display:inline-block;
+  margin-bottom:18px;
+  color:#9ca3af;
+  text-decoration:none;
+}
+
+.back:hover{
+  color:#fff;
+}
+
+.header{
+  background:#111827;
+  border:1px solid #263247;
+  border-radius:18px;
+  padding:24px;
+  margin-bottom:18px;
+}
+
+.header h1{
+  margin:0 0 8px;
+  font-size:27px;
+}
+
+.subtitle{
+  color:#9ca3af;
+  line-height:1.7;
+}
+
+.command{
+  background:#111827;
+  border:1px solid #263247;
+  border-radius:16px;
+  margin-bottom:12px;
+  overflow:hidden;
+}
+
+.command-header{
+  width:100%;
+  border:0;
+  background:transparent;
+  color:#fff;
+  padding:18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  cursor:pointer;
+  text-align:right;
+}
+
+.command-header:hover{
+  background:#151d2b;
+}
+
+.command-title{
+  font-size:17px;
+  font-weight:bold;
+}
+
+.command-arrow{
+  font-size:18px;
+  transition:.2s;
+}
+
+.command.open .command-arrow{
+  transform:rotate(180deg);
+}
+
+.command-panel{
+  display:none;
+  padding:0 18px 18px;
+  border-top:1px solid #263247;
+}
+
+.command.open .command-panel{
+  display:block;
+}
+
+.section{
+  margin-top:18px;
+}
+
+.section-title{
+  font-weight:bold;
+  margin-bottom:9px;
+}
+
+.help{
+  color:#9ca3af;
+  font-size:13px;
+  margin-bottom:9px;
+}
+
+input[type="text"]{
+  width:100%;
+  background:#0b0f17;
+  border:1px solid #344258;
+  color:#fff;
+  border-radius:10px;
+  padding:12px;
+  outline:none;
+}
+
+select{
+  width:100%;
+  min-height:130px;
+  background:#0b0f17;
+  border:1px solid #344258;
+  color:#fff;
+  border-radius:10px;
+  padding:10px;
+}
+
+option{
+  padding:8px;
+}
+
+.selection-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:8px;
+  max-height:300px;
+  overflow-y:auto;
+  padding:4px;
+}
+
+.selection-item{
+  min-height:44px;
+  border:1px solid #344258;
+  border-radius:10px;
+  background:#0b0f17;
+  color:#d1d5db;
+  padding:10px;
+  cursor:pointer;
+  text-align:right;
+  transition:.15s;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.selection-item:hover{
+  background:#1a2230;
+  border-color:#5865f2;
+}
+
+.selection-item.selected{
+  background:#29356f;
+  border-color:#5865f2;
+  color:#fff;
+  box-shadow:0 0 0 1px #5865f2 inset;
+}
+
+.selection-item.none-option.selected{
+  background:#3a2d10;
+  border-color:#facc15;
+  color:#facc15;
+}
+
+.selected-values{
+  display:none;
+}
+
+.aliases-list{
+  display:flex;
+  flex-direction:column;
+  gap:9px;
+}
+
+.alias-row{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+.alias-row input{
+  flex:1;
+}
+
+.alias-delete{
+  width:44px;
+  min-width:44px;
+  height:44px;
+  border:1px solid #344258;
+  border-radius:10px;
+  background:#1a2230;
+  color:#fff;
+  cursor:pointer;
+}
+
+.alias-delete:hover{
+  background:#3a2020;
+}
+
+.add-alias{
+  width:100%;
+  margin-top:10px;
+  padding:12px;
+  border:1px dashed #5865f2;
+  border-radius:10px;
+  background:#111827;
+  color:#fff;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+.add-alias:hover{
+  background:#1a2230;
+}
+
+.actions{
+  display:flex;
+  gap:10px;
+  margin-top:20px;
+}
+
+.save{
+  flex:1;
+  border:0;
+  border-radius:10px;
+  padding:13px;
+  background:#5865f2;
+  color:#fff;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+.close{
+  border:1px solid #344258;
+  border-radius:10px;
+  padding:13px 20px;
+  background:#1a2230;
+  color:#fff;
+  cursor:pointer;
+}
+
+.save:hover{
+  background:#4752c4;
+}
+
+.close:hover{
+  background:#263247;
+}
+
+.empty{
+  text-align:center;
+  color:#9ca3af;
+  padding:30px;
+}
+
+.unsaved{
+  display:none;
+  margin-top:12px;
+  padding:10px;
+  border-radius:9px;
+  background:#3a2d10;
+  border:1px solid #6b5318;
+  color:#facc15;
+  font-size:13px;
+}
+
+.command.dirty .unsaved{
+  display:block;
+}
+
+@media(max-width:600px){
+  .container{
+    margin:15px auto;
+    padding:12px;
+  }
+
+  .actions{
+    flex-direction:column;
+  }
+
+  .close{
+    width:100%;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<a class="back" href="/dashboard/<%= guildId %>">
+← العودة إلى لوحة التحكم
+</a>
+
+<div class="header">
+  <h1>⚡ إدارة الأوامر</h1>
+
+  <div class="subtitle">
+    خصص كل أمر من مكان واحد. افتح الأمر لتعديل الاختصار والرومات والرولات ثم احفظ التغييرات.
+  </div>
+</div>
+
+<% if (!commands || !commands.length) { %>
+
+<div class="header empty">
+  لا توجد أوامر متاحة.
+</div>
+
+<% } else { %>
+
+<% commands.forEach(command => { 
+
+  const setting =
+    (commandSettings || []).find(
+      item => item.command_name === command.name
+    ) || {};
+
+  const alias =
+    setting.alias || "";
+
+  const enabledChannels =
+    Array.isArray(setting.enabled_channels)
+      ? setting.enabled_channels
+      : [];
+
+  const disabledChannels =
+    Array.isArray(setting.disabled_channels)
+      ? setting.disabled_channels
+      : [];
+
+  const allowedRoles =
+    Array.isArray(setting.allowed_roles)
+      ? setting.allowed_roles
+      : [];
+
+  const blockedRoles =
+    Array.isArray(setting.blocked_roles)
+      ? setting.blocked_roles
+      : [];
+
+%>
+
+<div class="command" data-command="<%= command.name %>">
+
+  <button
+    type="button"
+    class="command-header"
+    onclick="toggleCommand(this)"
+  >
+
+    <span class="command-title">
+      <%= command.displayName || command.name %>
+    </span>
+
+    <span class="command-arrow">
+      ▼
+    </span>
+
+  </button>
+
+  <div class="command-panel">
+
+    <form
+      method="POST"
+      action="/dashboard/<%= guildId %>/commands/settings"
+      class="command-form"
+    >
+
+      <input
+        type="hidden"
+        name="command_name"
+        value="<%= command.name %>"
+      >
+
+      <div class="section">
+
+        <div class="section-title">
+          ⌨️ الأوامر المخصصة
+        </div>
+
+        <div class="help">
+          أضف أي عدد من الاختصارات التي تريدها لهذا الأمر.
+        </div>
+
+        <div class="aliases-list" data-aliases-list>
+
+          <%
+            const savedAliases = (aliases || []).filter(
+              item => item.command_name === command.name
+            );
+          %>
+
+          <% if (savedAliases.length) { %>
+
+            <% savedAliases.forEach(aliasItem => { %>
+
+              <div class="alias-row">
+
+                <input
+                  type="text"
+                  name="aliases"
+                  value="<%= aliasItem.alias %>"
+                  maxlength="32"
+                  placeholder="مثال: رصيدي"
+                >
+
+                <button
+                  type="button"
+                  class="alias-delete"
+                  onclick="removeAlias(this)"
+                >
+                  🗑️
+                </button>
+
+              </div>
+
+            <% }) %>
+
+          <% } else { %>
+
+            <div class="alias-row">
+
+              <input
+                type="text"
+                name="aliases"
+                value=""
+                maxlength="32"
+                placeholder="مثال: رصيدي"
+              >
+
+              <button
+                type="button"
+                class="alias-delete"
+                onclick="removeAlias(this)"
+              >
+                🗑️
+              </button>
+
+            </div>
+
+          <% } %>
+
+        </div>
+
+        <button
+          type="button"
+          class="add-alias"
+          onclick="addAlias(this)"
+        >
+          ➕ إضافة أمر
+        </button>
+
+      </div>
+
+      <div class="section">
+
+        <div class="section-title">
+          🟢 الرومات المفعلة
+        </div>
+
+        <div class="help">
+          اضغط على الرومات التي تريد السماح فيها بالأمر. يمكنك تحديد أكثر من روم.
+        </div>
+
+        <div class="selection-grid">
+
+          <button
+            type="button"
+            class="selection-item none-option <%= enabledChannels.length === 0 ? 'selected' : '' %>"
+            data-selection="enabled_channels"
+            data-value="NONE"
+          >
+            🚫 لا شيء
+          </button>
+
+          <% (channels || []).forEach(channel => { %>
+
+            <button
+              type="button"
+              class="selection-item <%= enabledChannels.includes(channel.id) ? 'selected' : '' %>"
+              data-selection="enabled_channels"
+              data-value="<%= channel.id %>"
+            >
+              # <%= channel.name %>
+            </button>
+
+          <% }) %>
+
+        </div>
+
+        <div class="selected-values" data-values="enabled_channels"></div>
+
+      </div>
+
+
+      <div class="section">
+
+        <div class="section-title">
+          🔴 الرومات المحجوبة
+        </div>
+
+        <div class="help">
+          اضغط على الرومات التي تريد منع الأمر فيها. يمكنك تحديد أكثر من روم.
+        </div>
+
+        <div class="selection-grid">
+
+          <button
+            type="button"
+            class="selection-item none-option <%= disabledChannels.length === 0 ? 'selected' : '' %>"
+            data-selection="disabled_channels"
+            data-value="NONE"
+          >
+            🚫 لا شيء
+          </button>
+
+          <% (channels || []).forEach(channel => { %>
+
+            <button
+              type="button"
+              class="selection-item <%= disabledChannels.includes(channel.id) ? 'selected' : '' %>"
+              data-selection="disabled_channels"
+              data-value="<%= channel.id %>"
+            >
+              # <%= channel.name %>
+            </button>
+
+          <% }) %>
+
+        </div>
+
+        <div class="selected-values" data-values="disabled_channels"></div>
+
+      </div>
+
+
+      <div class="section">
+
+        <div class="section-title">
+          👤 الرولات المستخدمة
+        </div>
+
+        <div class="help">
+          اضغط على الرولات التي يسمح لها باستخدام الأمر. يمكنك تحديد أكثر من رول.
+        </div>
+
+        <div class="selection-grid">
+
+          <button
+            type="button"
+            class="selection-item none-option <%= allowedRoles.length === 0 ? 'selected' : '' %>"
+            data-selection="allowed_roles"
+            data-value="NONE"
+          >
+            🚫 لا شيء
+          </button>
+
+          <% (roles || []).forEach(role => { %>
+
+            <button
+              type="button"
+              class="selection-item <%= allowedRoles.includes(role.id) ? 'selected' : '' %>"
+              data-selection="allowed_roles"
+              data-value="<%= role.id %>"
+            >
+              @<%= role.name %>
+            </button>
+
+          <% }) %>
+
+        </div>
+
+        <div class="selected-values" data-values="allowed_roles"></div>
+
+      </div>
+
+
+      <div class="section">
+
+        <div class="section-title">
+          🚫 الرولات المحجوبة
+        </div>
+
+        <div class="help">
+          اضغط على الرولات التي تريد منعها من استخدام الأمر. يمكنك تحديد أكثر من رول.
+        </div>
+
+        <div class="selection-grid">
+
+          <button
+            type="button"
+            class="selection-item none-option <%= blockedRoles.length === 0 ? 'selected' : '' %>"
+            data-selection="blocked_roles"
+            data-value="NONE"
+          >
+            🚫 لا شيء
+          </button>
+
+          <% (roles || []).forEach(role => { %>
+
+            <button
+              type="button"
+              class="selection-item <%= blockedRoles.includes(role.id) ? 'selected' : '' %>"
+              data-selection="blocked_roles"
+              data-value="<%= role.id %>"
+            >
+              @<%= role.name %>
+            </button>
+
+          <% }) %>
+
+        </div>
+
+        <div class="selected-values" data-values="blocked_roles"></div>
+
+      </div>
+
+      <div class="unsaved">
+        ⚠️ لديك تغييرات داخل هذا الأمر لم يتم حفظها.
+      </div>
+
+      <div class="actions">
+
+        <button
+          type="submit"
+          class="save"
+        >
+          💾 حفظ الأمر
+        </button>
+
+        <button
+          type="button"
+          class="close"
+          onclick="closeCommand(this)"
+        >
+          ✖ إغلاق
+        </button>
+
+      </div>
+
+    </form>
+
+  </div>
+
+</div>
+
+<% }) %>
+
+<% } %>
+
+</div>
+
+<script>
+
+function toggleCommand(button){
+
+  const command = button.closest(".command");
+
+  const opened = command.classList.contains("open");
+
+  document.querySelectorAll(".command.open").forEach(item => {
+
+    if(item !== command){
+      item.classList.remove("open");
+    }
+
+  });
+
+  if(!opened){
+    command.classList.add("open");
+  }
+
+}
+
+function closeCommand(button){
+
+  const command = button.closest(".command");
+
+  if(command.classList.contains("dirty")){
+
+    const leave = confirm(
+      "⚠️ لديك تغييرات داخل هذا الأمر لم يتم حفظها.\n\nهل تريد إغلاق لوحة الأمر بدون حفظ؟"
+    );
+
+    if(!leave){
+      return;
+    }
+
+  }
+
+  command.classList.remove("open");
+  command.classList.remove("dirty");
+
+}
+
+function setupSelectionButtons(form){
+
+  form.querySelectorAll(".selection-grid").forEach(grid => {
+
+    const buttons = [...grid.querySelectorAll(".selection-item")];
+
+    buttons.forEach(button => {
+
+      button.addEventListener("click", () => {
+
+        const value = button.dataset.value;
+
+        if(value === "NONE"){
+
+          buttons.forEach(item => {
+            item.classList.remove("selected");
+          });
+
+          button.classList.add("selected");
+
+        }else{
+
+          const none = buttons.find(
+            item => item.dataset.value === "NONE"
+          );
+
+          button.classList.toggle("selected");
+
+          const hasRealSelection = buttons.some(
+            item =>
+              item.dataset.value !== "NONE" &&
+              item.classList.contains("selected")
+          );
+
+          if(hasRealSelection && none){
+            none.classList.remove("selected");
+          }
+
+          if(!hasRealSelection && none){
+            none.classList.add("selected");
+          }
+
+        }
+
+        const command = form.closest(".command");
+
+        command.classList.add("dirty");
+
+      });
+
+    });
+
+  });
+
+}
+
+function injectSelectionInputs(form){
+
+  form.querySelectorAll('input[data-generated-selection]').forEach(
+    input => input.remove()
+  );
+
+  const groups = [
+    "enabled_channels",
+    "disabled_channels",
+    "allowed_roles",
+    "blocked_roles"
+  ];
+
+  groups.forEach(name => {
+
+    const grid = form.querySelector(
+      `.selection-grid .selection-item[data-selection="${name}"]`
+    )?.closest(".selection-grid");
+
+    if(!grid) return;
+
+    const selected = [
+      ...grid.querySelectorAll(
+        '.selection-item.selected:not([data-value="NONE"])'
+      )
+    ];
+
+    if(!selected.length){
+      const input = document.createElement("input");
+
+      input.type = "hidden";
+      input.name = name;
+      input.value = "NONE";
+      input.dataset.generatedSelection = "true";
+
+      form.appendChild(input);
+
+      return;
+    }
+
+    selected.forEach(button => {
+
+      const input = document.createElement("input");
+
+      input.type = "hidden";
+      input.name = name;
+      input.value = button.dataset.value;
+      input.dataset.generatedSelection = "true";
+
+      form.appendChild(input);
+
+    });
+
+  });
+
+}
+
+document.querySelectorAll(".command-form").forEach(form => {
+
+  setupSelectionButtons(form);
+
+  form.addEventListener("submit", () => {
+
+    injectSelectionInputs(form);
+
+    const command = form.closest(".command");
+
+    command.classList.remove("dirty");
+
+  });
+
+  const command = form.closest(".command");
+
+  const original = formState(form);
+
+  form.querySelectorAll("input, select").forEach(input => {
+
+    input.addEventListener("input", () => {
+
+      if(formState(form) !== original){
+        command.classList.add("dirty");
+      }else{
+        command.classList.remove("dirty");
+      }
+
+    });
+
+    input.addEventListener("change", () => {
+
+      if(formState(form) !== original){
+        command.classList.add("dirty");
+      }else{
+        command.classList.remove("dirty");
+      }
+
+    });
+
+  });
+
+  form.addEventListener("submit", () => {
+    command.classList.remove("dirty");
+  });
+
+});
+
+function addAlias(button){
+
+  const list =
+    button.closest(".section")
+      .querySelector("[data-aliases-list]");
+
+  const row = document.createElement("div");
+
+  row.className = "alias-row";
+
+  row.innerHTML = `
+    <input
+      type="text"
+      name="aliases"
+      maxlength="32"
+      placeholder="مثال: رصيدي"
+    >
+
+    <button
+      type="button"
+      class="alias-delete"
+      onclick="removeAlias(this)"
+    >
+      🗑️
+    </button>
+  `;
+
+  list.appendChild(row);
+
+  const input = row.querySelector("input");
+
+  input.focus();
+
+  const form = button.closest("form");
+  const command = form.closest(".command");
+
+  command.classList.add("dirty");
+}
+
+function removeAlias(button){
+
+  const row = button.closest(".alias-row");
+  const list = row.parentElement;
+  const form = button.closest("form");
+  const command = form.closest(".command");
+
+  row.remove();
+
+  // إبقاء خانة فارغة واحدة على الأقل
+  if(!list.querySelector(".alias-row")){
+
+    const newRow = document.createElement("div");
+
+    newRow.className = "alias-row";
+
+    newRow.innerHTML = `
+      <input
+        type="text"
+        name="aliases"
+        maxlength="32"
+        placeholder="مثال: رصيدي"
+      >
+
+      <button
+        type="button"
+        class="alias-delete"
+        onclick="removeAlias(this)"
+      >
+        🗑️
+      </button>
+    `;
+
+    list.appendChild(newRow);
+  }
+
+  command.classList.add("dirty");
+}
+
+function formState(form){
+
+  const data = new FormData(form);
+
+  const values = {};
+
+  for(const [key,value] of data.entries()){
+
+    if(values[key]){
+      values[key] += "|" + value;
+    }else{
+      values[key] = value;
+    }
+
+  }
+
+  return JSON.stringify(values);
+
+}
+
+window.addEventListener("beforeunload", function(event){
+
+  const dirty = document.querySelector(".command.dirty");
+
+  if(dirty){
+
+    event.preventDefault();
+    event.returnValue = "";
+
+  }
+
+});
+
+</script>
+
+</body>
+</html>
