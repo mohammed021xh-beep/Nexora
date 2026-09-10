@@ -84,7 +84,7 @@ async function processPaidMandatoryGiveaway(client, giveaway, users) {
         continue;
       }
 
-      await dbRun(
+      const entryResult = await dbRun(
         `INSERT INTO giveaway_entries
          (giveaway_id,user_id,joined_at,paid)
          VALUES (?,?,?,1)
@@ -95,6 +95,21 @@ async function processPaidMandatoryGiveaway(client, giveaway, users) {
           Date.now()
         ]
       );
+
+      if (!entryResult || Number(entryResult.rowCount || 0) < 1) {
+        await dbRun(
+          `UPDATE users
+           SET total_points = total_points + ?
+           WHERE guild_id=? AND user_id=?`,
+          [
+            fee,
+            giveaway.guild_id,
+            userId
+          ]
+        );
+
+        continue;
+      }
 
       participants.push(userId);
 
