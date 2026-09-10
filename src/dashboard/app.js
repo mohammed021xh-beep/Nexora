@@ -1727,6 +1727,11 @@ app.post("/dashboard/:guildId/giveaways", dashboardAuth, checkDashboardGuildAcce
           return res.status(404).send("❌ قناة السحب غير موجودة");
         }
 
+        if (!channel.isTextBased()) {
+          creatingGiveaways.delete(guildId);
+          return res.status(400).send("❌ قناة السحب يجب أن تكون قناة نصية");
+        }
+
         const fee = Number(entry_fee || 0);
 
         const feeText = fee > 0
