@@ -11,6 +11,9 @@ db.exec(`
     last_message BIGINT DEFAULT 0,
     last_voice BIGINT DEFAULT 0,
     message_count INTEGER DEFAULT 0,
+    voice_started_at BIGINT DEFAULT 0,
+    voice_accumulated BIGINT DEFAULT 0,
+    voice_interval_minutes INTEGER DEFAULT 0,
     UNIQUE(guild_id,user_id)
   );
 
@@ -51,6 +54,13 @@ db.exec(`
     );
   `);
 
+
+db.exec(`
+  ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS voice_started_at BIGINT DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS voice_accumulated BIGINT DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS voice_interval_minutes INTEGER DEFAULT 0;
+`);
 
 console.log("✅ تم إنشاء جداول قاعدة البيانات");
 

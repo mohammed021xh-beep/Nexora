@@ -22,7 +22,7 @@ module.exports = {
     db.run(
       "DELETE FROM staff WHERE guild_id=? AND user_id=?",
       [interaction.guild.id, member.id],
-      function(err) {
+      async function(err, result) {
 
         if (err) {
           return interaction.reply({
@@ -31,7 +31,7 @@ module.exports = {
           });
         }
 
-        if (this.changes === 0) {
+        if (!result || result.rowCount === 0) {
           return interaction.reply({
             content: "❌ هذا العضو ليس موظفًا",
             ephemeral: true

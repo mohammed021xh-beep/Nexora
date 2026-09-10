@@ -63,64 +63,59 @@ async function processPaidMandatoryGiveaway(client, giveaway, users) {
 
   for (const userId of users) {
     try {
-      const existing = await dbGet(
-        `SELECT id
-         FROM giveaway_entries
-         WHERE giveaway_id=? AND user_id=?`,
-        [giveaway.id, userId]
-      );
+      const joined = await db.transaction(async (tx) => {
 
-      if (existing) {
-        participants.push(userId);
-        continue;
-      }
+        const existing = await tx.get(
+          `SELECT id
+           FROM giveaway_entries
+           WHERE giveaway_id=? AND user_id=?`,
+          [giveaway.id, userId]
+        );
 
-      const result = await dbRun(
-        `UPDATE users
-         SET total_points = total_points - ?
-         WHERE guild_id=?
-           AND user_id=?
-           AND total_points >= ?`,
-        [
-          fee,
-          giveaway.guild_id,
-          userId,
-          fee
-        ]
-      );
+        if (existing) {
+          return true;
+        }
 
-      if (!result || Number(result.rowCount || 0) < 1) {
-        continue;
-      }
-
-      const entryResult = await dbRun(
-        `INSERT INTO giveaway_entries
-         (giveaway_id,user_id,joined_at,paid)
-         VALUES (?,?,?,1)
-         ON CONFLICT (giveaway_id,user_id) DO NOTHING`,
-        [
-          giveaway.id,
-          userId,
-          Date.now()
-        ]
-      );
-
-      if (!entryResult || Number(entryResult.rowCount || 0) < 1) {
-        await dbRun(
+        const result = await tx.run(
           `UPDATE users
-           SET total_points = total_points + ?
-           WHERE guild_id=? AND user_id=?`,
+           SET total_points = total_points - ?
+           WHERE guild_id=?
+             AND user_id=?
+             AND total_points >= ?`,
           [
             fee,
             giveaway.guild_id,
-            userId
+            userId,
+            fee
           ]
         );
 
-        continue;
-      }
+        if (!result || Number(result.rowCount || 0) < 1) {
+          return false;
+        }
 
-      participants.push(userId);
+        const entryResult = await tx.run(
+          `INSERT INTO giveaway_entries
+           (giveaway_id,user_id,joined_at,paid)
+           VALUES (?,?,?,1)
+           ON CONFLICT (giveaway_id,user_id) DO NOTHING`,
+          [
+            giveaway.id,
+            userId,
+            Date.now()
+          ]
+        );
+
+        if (!entryResult || Number(entryResult.rowCount || 0) < 1) {
+          throw new Error("تعذر تسجيل المشاركة بعد خصم النقاط");
+        }
+
+        return true;
+      });
+
+      if (joined) {
+        participants.push(userId);
+      }
 
     } catch (err) {
       console.error(

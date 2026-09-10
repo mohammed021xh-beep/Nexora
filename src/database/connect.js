@@ -121,6 +121,51 @@ const db = {
     }
   },
 
+  async transaction(callback) {
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      const tx = {
+        async run(sql, params = []) {
+          return client.query(convertSQL(sql), params);
+        },
+
+        async get(sql, params = []) {
+          const result = await client.query(
+            convertSQL(sql),
+            params
+          );
+
+          return result.rows[0];
+        },
+
+        async all(sql, params = []) {
+          const result = await client.query(
+            convertSQL(sql),
+            params
+          );
+
+          return result.rows;
+        }
+      };
+
+      const result = await callback(tx);
+
+      await client.query("COMMIT");
+
+      return result;
+
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw err;
+
+    } finally {
+      client.release();
+    }
+  },
+
   async close() {
     await pool.end();
   }
