@@ -46,11 +46,8 @@ async function sendShopLog(guild, data) {
 
     const embed = new EmbedBuilder()
       .setTitle(data.title || "📋 سجل المتجر")
+      .setDescription(data.description || "")
       .setTimestamp();
-
-    if (data.description) {
-      embed.setDescription(data.description);
-    }
 
     if (data.fields?.length) {
       embed.addFields(data.fields);
@@ -220,6 +217,33 @@ client.on("interactionCreate", async interaction => {
 
       // تأكيد تفاعل زر الشراء فوراً
       try {
+        await interaction.deferReply({ ephemeral: true });
+        console.log("✅ BUY DEFERRED");
+      } catch (deferErr) {
+        console.error("❌ BUY DEFER ERROR:", deferErr);
+        return;
+      }
+
+
+      // تأكيد تفاعل زر الشراء فوراً
+      try {
+        console.log("✅ BUY DEFERRED");
+      } catch (deferErr) {
+        console.error("❌ BUY DEFER ERROR:", deferErr);
+        return;
+      }
+
+
+      // تأكيد تفاعل زر الشراء فوراً
+      try {
+        console.log("✅ BUY DEFERRED");
+      } catch (deferErr) {
+        console.error("❌ BUY DEFER ERROR:", deferErr);
+        return;
+      }
+
+
+      try {
 
         db.get(
           "SELECT * FROM shop_items WHERE id=? AND guild_id=? AND enabled=1",
@@ -300,9 +324,6 @@ client.on("interactionCreate", async interaction => {
 
               return interaction.showModal(modal);
             }
-
-            await interaction.deferReply({ ephemeral: true });
-            console.log("✅ BUY DEFERRED");
 
             db.get(
               "SELECT * FROM users WHERE guild_id=? AND user_id=?",
@@ -430,11 +451,8 @@ client.on("interactionCreate", async interaction => {
 
                           try {
 
-                            let purchaseMessage;
-
-                            try {
-                              purchaseMessage = await channel.send({
-                                content:
+                            await channel.send({
+                              content:
 `🛒 **طلب شراء جديد**
 
 👤 العضو: <@${userId}>
@@ -444,38 +462,8 @@ client.on("interactionCreate", async interaction => {
 💰 السعر: ${item.price}
 
 🟡 الحالة: قيد المراجعة`,
-                                components: [row]
-                              });
-                            } catch (sendErr) {
-                              console.error(
-                                "⚠️ BUY CHANNEL SEND FAILED, RETRYING:",
-                                sendErr
-                              );
-
-                              // محاولة الحصول على القناة من Discord مباشرة ثم إعادة الإرسال
-                              const freshChannel =
-                                await interaction.guild.channels
-                                  .fetch(settings.purchase_channel)
-                                  .catch(() => null);
-
-                              if (!freshChannel || !freshChannel.isTextBased()) {
-                                throw sendErr;
-                              }
-
-                              purchaseMessage = await freshChannel.send({
-                                content:
-`🛒 **طلب شراء جديد**
-
-👤 العضو: <@${userId}>
-🆔 ID: ${userId}
-
-📦 المنتج: ${item.name}
-💰 السعر: ${item.price}
-
-🟡 الحالة: قيد المراجعة`,
-                                components: [row]
-                              });
-                            }
+                              components: [row]
+                            });
 
                             db.run(
                               `INSERT INTO purchases
@@ -633,262 +621,14 @@ client.on("interactionCreate", async interaction => {
       return;
     }
 
-    
-// 🎁 GIVEAWAY JOIN HANDLER
-if (
-  interaction.isButton() &&
-  interaction.customId?.startsWith("join_giveaway_")
-) {
-  const db = require("./database/connect");
-
-  try {
-    const giveawayId = interaction.customId.slice("join_giveaway_".length);
-    const guildId = interaction.guild?.id;
-    const userId = interaction.user.id;
-
-    if (!giveawayId || !guildId) {
-      return interaction.reply({
-        content: "❌ تعذر معالجة المشاركة.",
-        ephemeral: true
-      });
-    }
-
-    console.log(
-      "🎁 GIVEAWAY JOIN:",
-      giveawayId,
-      "| USER:",
-      userId
-    );
-
-    const giveaway = await db.get(
-      `SELECT *
-       FROM giveaways
-       WHERE id=? AND guild_id=?`,
-      [giveawayId, guildId]
-    );
-
-    if (!giveaway) {
-      return interaction.reply({
-        content: "❌ هذا السحب غير موجود.",
-        ephemeral: true
-      });
-    }
-
-    if (giveaway.status !== "active") {
-      return interaction.reply({
-        content: "❌ هذا السحب انتهى أو غير متاح حالياً.",
-        ephemeral: true
-      });
-    }
-
-    if (
-      Number.isFinite(Number(giveaway.run_at)) &&
-      Date.now() >= Number(giveaway.run_at)
-    ) {
-      return interaction.reply({
-        content: "⏰ انتهى وقت المشاركة في هذا السحب.",
-        ephemeral: true
-      });
-    }
-
-    const member = await interaction.guild.members
-      .fetch(userId)
-      .catch(() => null);
-
-    if (!member) {
-      return interaction.reply({
-        content: "❌ تعذر التحقق من عضويتك في السيرفر.",
-        ephemeral: true
-      });
-    }
-
-    if (member.user.bot) {
-      return interaction.reply({
-        content: "❌ البوتات لا يمكنها المشاركة.",
-        ephemeral: true
-      });
-    }
-
-    // 🔐 التحقق من الرتبة المطلوبة
-    if (giveaway.role_id) {
-      if (!member.roles.cache.has(giveaway.role_id)) {
-        return interaction.reply({
-          content: "❌ لا تملك الرتبة المطلوبة للمشاركة في هذا السحب.",
-          ephemeral: true
-        });
-      }
-    }
-
-    // 🚫 منع المشاركة أكثر من مرة
-    const existing = await db.get(
-      `SELECT id
-       FROM giveaway_entries
-       WHERE giveaway_id=? AND user_id=?`,
-      [giveawayId, userId]
-    );
-
-    if (existing) {
-      return interaction.reply({
-        content: "⚠️ أنت مشارك بالفعل في هذا السحب.",
-        ephemeral: true
-      });
-    }
-
-    const fee = Math.max(
-      0,
-      Number(giveaway.entry_fee || 0)
-    );
-
-    // 💰 السحب المدفوع
-    if (fee > 0) {
-      const user = await db.get(
-        `SELECT total_points
-         FROM users
-         WHERE guild_id=? AND user_id=?`,
-        [guildId, userId]
-      );
-
-      const balance = Number(user?.total_points || 0);
-
-      if (balance < fee) {
-        return interaction.reply({
-          content:
-            `❌ نقاطك غير كافية.\n\n💰 رسوم المشاركة: **${fee} نقطة**\n💳 رصيدك الحالي: **${balance} نقطة**`,
-          ephemeral: true
-        });
-      }
-
-      const updated = await db.run(
-        `UPDATE users
-         SET total_points=total_points-?
-         WHERE guild_id=? AND user_id=? AND total_points>=?`,
-        [fee, guildId, userId, fee]
-      );
-
-      if (!updated?.rowCount) {
-        return interaction.reply({
-          content: "❌ تعذر خصم رسوم المشاركة، حاول مرة أخرى.",
-          ephemeral: true
-        });
-      }
-
-      try {
-        await db.run(
-          `INSERT INTO giveaway_entries
-           (giveaway_id,user_id,joined_at,paid)
-           VALUES (?,?,?,1)`,
-          [giveawayId, userId, Date.now()]
-        );
-      } catch (entryErr) {
-        // 🔄 إذا فشل تسجيل المشاركة، نرجع النقاط
-        await db.run(
-          `UPDATE users
-           SET total_points=total_points+?
-           WHERE guild_id=? AND user_id=?`,
-          [fee, guildId, userId]
-        );
-
-        if (
-          String(entryErr?.message || "").toLowerCase().includes("unique")
-        ) {
-          return interaction.reply({
-            content: "⚠️ أنت مشارك بالفعل في هذا السحب.",
-            ephemeral: true
-          });
-        }
-
-        throw entryErr;
-      }
-
-      console.log(
-        "✅ GIVEAWAY PAID JOIN:",
-        giveawayId,
-        "| USER:",
-        userId,
-        "| FEE:",
-        fee
-      );
-
-      return interaction.reply({
-        content:
-          `🎉 تمت مشاركتك بنجاح!\n\n🎁 **${giveaway.prize}**\n💰 تم خصم **${fee} نقطة** من رصيدك.`,
-        ephemeral: true
-      });
-    }
-
-    // 🆓 السحب المجاني
-    try {
-      await db.run(
-        `INSERT INTO giveaway_entries
-         (giveaway_id,user_id,joined_at,paid)
-         VALUES (?,?,?,0)`,
-        [giveawayId, userId, Date.now()]
-      );
-    } catch (entryErr) {
-      if (
-        String(entryErr?.message || "").toLowerCase().includes("unique")
-      ) {
-        return interaction.reply({
-          content: "⚠️ أنت مشارك بالفعل في هذا السحب.",
-          ephemeral: true
-        });
-      }
-
-      throw entryErr;
-    }
-
-    console.log(
-      "✅ GIVEAWAY FREE JOIN:",
-      giveawayId,
-      "| USER:",
-      userId
-    );
-
-    return interaction.reply({
-      content:
-        `🎉 تمت مشاركتك بنجاح!\n\n🎁 الجائزة: **${giveaway.prize}**`,
-      ephemeral: true
-    });
-
-  } catch (err) {
-    console.error("❌ GIVEAWAY JOIN ERROR:", err);
-
-    if (!interaction.replied && !interaction.deferred) {
-      return interaction.reply({
-        content: "❌ حدث خطأ أثناء تسجيل مشاركتك.",
-        ephemeral: true
-      }).catch(() => {});
-    }
-  }
-}
-
-if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
-
-      const db = require("./database/connect");
+    if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
 
       if (!(await checkStaffPermission(interaction)))
         return;
 
-      const data = interaction.customId.split("_");
-      const userId = data[1];
-      const itemId = data[2];
-      const price = parseInt(data[3]);
-
-      const item = await db.get(
-        "SELECT name FROM shop_items WHERE id=? AND guild_id=?",
-        [itemId, interaction.guild.id]
-      );
-
-      const guildName = interaction.guild.name;
-      const itemName = item?.name || "غير معروف";
-
       await interaction.update({
-        content:
-          interaction.message.content +
-          "\n\n✅ **تم التسليم**\n👮 تم بواسطة: <@" +
-          interaction.user.id +
-          ">",
-        components: []
+        content: interaction.message.content + "\n\n✅ **تم التسليم**",
+        components:[]
       });
 
       await sendShopLog(interaction.guild, {
@@ -897,49 +637,16 @@ if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
         fields: [
           {
             name: "👤 العضو",
-            value: `<@${userId}>`,
+            value: `<@${interaction.customId.split("_")[1]}>`,
             inline: true
-          },
-          {
-            name: "📦 المنتج",
-            value: itemName,
-            inline: true
-          },
-          {
-            name: "💰 السعر",
-            value: `${price} 🪙`,
-            inline: true
-          },
-          {
-            name: "🏠 السيرفر",
-            value: guildName,
-            inline: false
           },
           {
             name: "👮 الموظف",
             value: `<@${interaction.user.id}>`,
-            inline: false
+            inline: true
           }
         ]
       });
-
-      const member = await interaction.guild.members
-        .fetch(userId)
-        .catch(() => null);
-
-      if (member) {
-        await member.send(
-`✅ **تم تسليم منتجك الذي اشتريته بنجاح**
-
-📦 المنتج: ${itemName}
-💰 السعر: ${price} 🪙
-🏠 السيرفر: ${guildName}
-
-شكراً لشرائك من متجرنا ❤️`
-        ).catch(err => {
-          console.log("⚠️ تعذر إرسال DM للمشتري:", err.message);
-        });
-      }
 
       return;
     }
@@ -1004,26 +711,9 @@ if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
         ]
       });
 
-      const guildName = interaction.guild.name;
-      const itemName = rejectItem?.name || "غير معروف";
-
-      const member = await interaction.guild.members
-        .fetch(userId)
-        .catch(() => null);
-
-      if (member) {
-        await member.send(
-`❌ **تم إلغاء طلب الشراء الخاص بك**
-
-📦 المنتج: ${itemName}
-💰 تم إرجاع: ${price} 🪙
-🏠 السيرفر: ${guildName}
-
-تمت إعادة النقاط إلى رصيدك.`
-        ).catch(err => {
-          console.log("⚠️ تعذر إرسال DM للمشتري:", err.message);
-        });
-      }
+      Promise.resolve(interaction.guild.members.cache.get(userId)).then(member=>{
+        member.send("❌ تم رفض طلبك وتمت إعادة نقاطك.").catch(()=>{});
+      }).catch(()=>{});
 
       return;
     }
@@ -1033,8 +723,6 @@ if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
   if (interaction.isModalSubmit()) {
 
     if (interaction.customId.startsWith("buy_input_")) {
-
-      await interaction.deferReply({ ephemeral: true });
 
       const db = require("./database/connect");
 
@@ -1049,14 +737,14 @@ if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
         async (err, item) => {
 
           if (err || !item) {
-            return interaction.editReply({
+            return interaction.reply({
               content: "❌ المنتج غير موجود",
               ephemeral: true
             });
           }
 
           if (item.stock === 0) {
-            return interaction.editReply({
+            return interaction.reply({
               content: "❌ نفذت الكمية",
               ephemeral: true
             });
@@ -1069,7 +757,7 @@ if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
               .catch(() => null);
 
             if (!member || !member.roles.cache.has(item.required_role_id)) {
-              return interaction.editReply({
+              return interaction.reply({
                 content: "❌ لا يمكنك شراء هذا المنتج، يجب أن تمتلك الرتبة المطلوبة.",
                 ephemeral: true
               });
@@ -1084,7 +772,7 @@ if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
             function(err, result) {
 
               if (err || !result || result.rowCount === 0) {
-                return interaction.editReply({
+                return interaction.reply({
                   content: "❌ رصيدك لا يكفي أو تعذر خصم النقاط.",
                   ephemeral: true
                 });
@@ -1106,7 +794,7 @@ if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
                       [item.price, guildId, userId]
                     );
 
-                    return interaction.editReply({
+                    return interaction.reply({
                       content: stockErr
                         ? "❌ حدث خطأ أثناء تحديث كمية المنتج وتمت إعادة النقاط."
                         : "❌ نفذت الكمية وتمت إعادة النقاط.",
@@ -1145,7 +833,7 @@ if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
                       );
                     }
 
-                    return interaction.editReply({
+                    return interaction.reply({
                       content: "❌ حدث خطأ أثناء تسجيل الطلب وتمت إعادة النقاط والكمية.",
                       ephemeral: true
                     });
@@ -1162,7 +850,7 @@ if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
                           [item.price, guildId, userId]
                         );
 
-                        return interaction.editReply({
+                        return interaction.reply({
                           content: "❌ لم يتم تحديد قناة الطلبات وتمت إعادة النقاط.",
                           ephemeral: true
                         });
@@ -1178,7 +866,7 @@ if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
                           [item.price, guildId, userId]
                         );
 
-                        return interaction.editReply({
+                        return interaction.reply({
                           content: "❌ قناة الطلبات غير موجودة وتمت إعادة النقاط.",
                           ephemeral: true
                         });
@@ -1208,9 +896,8 @@ if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
                         ]
                       });
 
-                      try {
-                        await channel.send({
-                          content: `🛒 **طلب شراء جديد**
+                      await channel.send({
+                        content: `🛒 **طلب شراء جديد**
 
 👤 العضو: <@${userId}>
 🆔 ID: ${userId}
@@ -1222,42 +909,8 @@ if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
 ${userInput}
 
 🟡 الحالة: قيد المراجعة`,
-                          components: [row]
-                        });
-                      } catch (sendErr) {
-                        console.error(
-                          "⚠️ MODAL BUY CHANNEL SEND FAILED, RETRYING:",
-                          sendErr
-                        );
-
-                        const freshChannel =
-                          await interaction.guild.channels
-                            .fetch(settings.purchase_channel)
-                            .catch(() => null);
-
-                        if (
-                          !freshChannel ||
-                          !freshChannel.isTextBased()
-                        ) {
-                          throw sendErr;
-                        }
-
-                        await freshChannel.send({
-                          content: `🛒 **طلب شراء جديد**
-
-👤 العضو: <@${userId}>
-🆔 ID: ${userId}
-
-📦 المنتج: ${item.name}
-💰 السعر: ${item.price}
-
-📝 ${item.input_name || "المعلومات"}:
-${userInput}
-
-🟡 الحالة: قيد المراجعة`,
-                          components: [row]
-                        });
-                      }
+                        components: [row]
+                      });
 
                       await sendShopLog(interaction.guild, {
                         title: "🛒 طلب شراء جديد",
@@ -1286,7 +939,7 @@ ${userInput}
                         ]
                       });
 
-                      return interaction.editReply({
+                      return interaction.reply({
                         content:
 `✅ تم تسجيل طلبك
 

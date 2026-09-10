@@ -146,23 +146,7 @@ module.exports = {
 
         collector.on("end", async () => {
           await interaction.editReply({
-            components: [
-              new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                  .setCustomId("leaderboard_previous_disabled")
-                  .setLabel("السابق")
-                  .setEmoji("◀️")
-                  .setStyle(ButtonStyle.Secondary)
-                  .setDisabled(true),
-
-                new ButtonBuilder()
-                  .setCustomId("leaderboard_next_disabled")
-                  .setLabel("التالي")
-                  .setEmoji("▶️")
-                  .setStyle(ButtonStyle.Primary)
-                  .setDisabled(true)
-              )
-            ]
+            components: []
           }).catch(() => {});
         });
       }
