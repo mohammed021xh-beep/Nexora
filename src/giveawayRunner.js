@@ -201,9 +201,9 @@ async function finishGiveaway(client, giveaway, users) {
     .fetch(giveaway.channel_id)
     .catch(() => null);
 
-  if (channel) {
-
-    await channel.send(
+  if (channel?.isTextBased()) {
+    try {
+      await channel.send(
 `🏆 **انتهى السحب**
 
 📌 **${giveaway.name}**
@@ -212,7 +212,14 @@ async function finishGiveaway(client, giveaway, users) {
 
 🏆 **الفائزون:**
 ${winners.map(id => `<@${id}>`).join(", ")}`
-    );
+      );
+    } catch (err) {
+      console.error(
+        "❌ GIVEAWAY RESULT MESSAGE ERROR:",
+        giveaway.id,
+        err?.message || err
+      );
+    }
   }
 
   await dbRun(
