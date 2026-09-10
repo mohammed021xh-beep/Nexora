@@ -33,7 +33,16 @@ function dbRun(sql, params = []) {
 async function getEligibleMembers(client, giveaway) {
   const guild = await client.guilds.fetch(giveaway.guild_id);
 
-  await guild.members.fetch();
+  try {
+    await guild.members.fetch();
+  } catch (err) {
+    console.error(
+      "❌ GIVEAWAY MEMBERS FETCH ERROR:",
+      giveaway.id,
+      giveaway.guild_id,
+      err?.message || err
+    );
+  }
 
   return [...guild.members.cache.values()]
     .filter(member => {
