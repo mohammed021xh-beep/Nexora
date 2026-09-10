@@ -1493,7 +1493,7 @@ dashboard.set("client", client);
 dashboard.locals.client = client;
 
 dashboard.listen(process.env.PORT || 15719, "0.0.0.0", () => {
-  console.log("🌐 Dashboard running on port 3000");
+  console.log(`🌐 Dashboard running on port ${process.env.PORT || 15719}`);
 });
 
 require("./database/currencySetup");
