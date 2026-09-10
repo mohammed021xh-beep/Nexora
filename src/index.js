@@ -63,6 +63,45 @@ async function sendShopLog(guild, data) {
   }
 }
 
+
+async function safeShopReply(interaction, content) {
+  try {
+    if (interaction.deferred || interaction.replied) {
+      return await interaction.editReply({ content });
+    }
+
+    return await interaction.reply({
+      content,
+      ephemeral: true
+    });
+  } catch (err) {
+    const msg = String(err?.message || err || "").toLowerCase();
+
+    if (
+      msg.includes("unknown message") ||
+      msg.includes("10008") ||
+      msg.includes("interaction has already been acknowledged")
+    ) {
+      try {
+        const channel =
+          interaction.channel ||
+          await interaction.guild?.channels.fetch(interaction.channelId).catch(() => null);
+
+        if (channel?.isTextBased()) {
+          return await channel.send({
+            content,
+            allowedMentions: { repliedUser: false }
+          });
+        }
+      } catch (fallbackErr) {
+        console.error("❌ SHOP FALLBACK SEND ERROR:", fallbackErr);
+      }
+    }
+
+    throw err;
+  }
+}
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -520,15 +559,15 @@ client.on("interactionCreate", async interaction => {
                                   ]
                                 });
 
-                                return interaction.editReply({
-                                  content:
+                                return safeShopReply(
+                                  interaction,
 `✅ تم تسجيل طلبك بنجاح.
 
 📦 المنتج: ${item.name}
 💰 تم خصم: ${item.price} 🪙
 
 🟡 الطلب بانتظار مراجعة الإدارة.`
-                                });
+                                );
 
                               }
                             );
@@ -642,12 +681,15 @@ if (
   const db = require("./database/connect");
 
   try {
+    // تأكيد زر السحب فوراً قبل أي عمليات DB أو Discord API
+    await interaction.deferReply({ ephemeral: true });
+
     const giveawayId = interaction.customId.slice("join_giveaway_".length);
     const guildId = interaction.guild?.id;
     const userId = interaction.user.id;
 
     if (!giveawayId || !guildId) {
-      return interaction.reply({
+      return interaction.editReply({
         content: "❌ تعذر معالجة المشاركة.",
         ephemeral: true
       });
@@ -668,14 +710,14 @@ if (
     );
 
     if (!giveaway) {
-      return interaction.reply({
+      return interaction.editReply({
         content: "❌ هذا السحب غير موجود.",
         ephemeral: true
       });
     }
 
     if (giveaway.status !== "active") {
-      return interaction.reply({
+      return interaction.editReply({
         content: "❌ هذا السحب انتهى أو غير متاح حالياً.",
         ephemeral: true
       });
@@ -685,7 +727,7 @@ if (
       Number.isFinite(Number(giveaway.run_at)) &&
       Date.now() >= Number(giveaway.run_at)
     ) {
-      return interaction.reply({
+      return interaction.editReply({
         content: "⏰ انتهى وقت المشاركة في هذا السحب.",
         ephemeral: true
       });
@@ -696,14 +738,14 @@ if (
       .catch(() => null);
 
     if (!member) {
-      return interaction.reply({
+      return interaction.editReply({
         content: "❌ تعذر التحقق من عضويتك في السيرفر.",
         ephemeral: true
       });
     }
 
     if (member.user.bot) {
-      return interaction.reply({
+      return interaction.editReply({
         content: "❌ البوتات لا يمكنها المشاركة.",
         ephemeral: true
       });
@@ -712,7 +754,7 @@ if (
     // 🔐 التحقق من الرتبة المطلوبة
     if (giveaway.role_id) {
       if (!member.roles.cache.has(giveaway.role_id)) {
-        return interaction.reply({
+        return interaction.editReply({
           content: "❌ لا تملك الرتبة المطلوبة للمشاركة في هذا السحب.",
           ephemeral: true
         });
@@ -728,7 +770,7 @@ if (
     );
 
     if (existing) {
-      return interaction.reply({
+      return interaction.editReply({
         content: "⚠️ أنت مشارك بالفعل في هذا السحب.",
         ephemeral: true
       });
@@ -751,7 +793,7 @@ if (
       const balance = Number(user?.total_points || 0);
 
       if (balance < fee) {
-        return interaction.reply({
+        return interaction.editReply({
           content:
             `❌ نقاطك غير كافية.\n\n💰 رسوم المشاركة: **${fee} نقطة**\n💳 رصيدك الحالي: **${balance} نقطة**`,
           ephemeral: true
@@ -766,7 +808,7 @@ if (
       );
 
       if (!updated?.rowCount) {
-        return interaction.reply({
+        return interaction.editReply({
           content: "❌ تعذر خصم رسوم المشاركة، حاول مرة أخرى.",
           ephemeral: true
         });
@@ -791,7 +833,7 @@ if (
         if (
           String(entryErr?.message || "").toLowerCase().includes("unique")
         ) {
-          return interaction.reply({
+          return interaction.editReply({
             content: "⚠️ أنت مشارك بالفعل في هذا السحب.",
             ephemeral: true
           });
@@ -809,7 +851,7 @@ if (
         fee
       );
 
-      return interaction.reply({
+      return interaction.editReply({
         content:
           `🎉 تمت مشاركتك بنجاح!\n\n🎁 **${giveaway.prize}**\n💰 تم خصم **${fee} نقطة** من رصيدك.`,
         ephemeral: true
@@ -828,7 +870,7 @@ if (
       if (
         String(entryErr?.message || "").toLowerCase().includes("unique")
       ) {
-        return interaction.reply({
+        return interaction.editReply({
           content: "⚠️ أنت مشارك بالفعل في هذا السحب.",
           ephemeral: true
         });
@@ -844,7 +886,7 @@ if (
       userId
     );
 
-    return interaction.reply({
+    return interaction.editReply({
       content:
         `🎉 تمت مشاركتك بنجاح!\n\n🎁 الجائزة: **${giveaway.prize}**`,
       ephemeral: true
@@ -853,12 +895,16 @@ if (
   } catch (err) {
     console.error("❌ GIVEAWAY JOIN ERROR:", err);
 
-    if (!interaction.replied && !interaction.deferred) {
-      return interaction.reply({
-        content: "❌ حدث خطأ أثناء تسجيل مشاركتك.",
-        ephemeral: true
+    if (interaction.deferred || interaction.replied) {
+      return interaction.editReply({
+        content: "❌ حدث خطأ أثناء تسجيل مشاركتك."
       }).catch(() => {});
     }
+
+    return interaction.reply({
+      content: "❌ حدث خطأ أثناء تسجيل مشاركتك.",
+      ephemeral: true
+    }).catch(() => {});
   }
 }
 
