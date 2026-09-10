@@ -29,7 +29,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS giveaway_winners (
     id SERIAL PRIMARY KEY,
     giveaway_id INTEGER NOT NULL,
-    user_id TEXT NOT NULL
+    user_id TEXT NOT NULL,
+    created_at BIGINT
   );
 `);
 
