@@ -155,11 +155,32 @@ module.exports = {
             }
 
             if (!user) {
+              const firstCount = 1;
+
+              if (firstCount >= required) {
+                return db.run(
+                  `INSERT INTO users
+                   (guild_id, user_id, message_count, text_points, total_points)
+                   VALUES (?, ?, 0, ?, ?)`,
+                  [guildId, userId, points, points],
+                  err => {
+                    if (err) {
+                      console.error("❌ FIRST POINT INSERT ERROR:", err);
+                      return;
+                    }
+
+                    console.log(
+                      `[POINTS] ${message.author.tag}: +${points} نقطة`
+                    );
+                  }
+                );
+              }
+
               return db.run(
                 `INSERT INTO users
                  (guild_id, user_id, message_count)
-                 VALUES (?, ?, 0)`,
-                [guildId, userId]
+                 VALUES (?, ?, ?)`,
+                [guildId, userId, firstCount]
               );
             }
 

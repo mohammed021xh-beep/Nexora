@@ -685,10 +685,10 @@ app.get("/settings/:guildId", dashboardAuth, checkDashboardGuildAccess, (req, re
         settings = {
           text_points: 1,
           voice_points: 1,
-          voice_interval: 10,
+          voice_interval: 1,
           voice_enabled: 1,
-          min_message_length: 10,
-          messages_required: 1
+          min_message_length: 3,
+          messages_required: 30
         };
       }
 
