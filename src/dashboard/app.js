@@ -2059,13 +2059,9 @@ app.get("/dashboard/:guildId/giveaways/reroll/:id", dashboardAuth, checkDashboar
     }
 
     /*
-     * حذف النتائج القديمة.
+     * الاحتفاظ بكل الفائزين السابقين حتى لا يفوز
+     * أي شخص أكثر من مرة في نفس السحب.
      */
-    await db.run(
-      `DELETE FROM giveaway_winners
-       WHERE giveaway_id=?`,
-      [id]
-    );
 
     /*
      * حفظ الفائزين الجدد.
