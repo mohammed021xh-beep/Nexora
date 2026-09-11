@@ -15,7 +15,8 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  EmbedBuilder
+  EmbedBuilder,
+  WebhookClient
 } = require("discord.js");
 
 require("./database/connect");
@@ -63,6 +64,74 @@ async function sendShopLog(guild, data) {
   }
 }
 
+
+async function sendPurchaseWebhook(channel, embed, components = []) {
+  try {
+    const webhook = await channel.createWebhook({
+      name: "Nexora • Purchases",
+      avatar: client.user?.displayAvatarURL({ extension: "png", size: 256 }),
+      reason: "Nexora shop purchase requests"
+    });
+
+    try {
+      return await webhook.send({
+        embeds: [embed],
+        components,
+        username: "Nexora • Purchases",
+        avatarURL: client.user?.displayAvatarURL({ extension: "png", size: 256 })
+      });
+    } catch (sendErr) {
+      console.error("❌ PURCHASE WEBHOOK SEND ERROR:", sendErr);
+      throw sendErr;
+    }
+  } catch (err) {
+    console.error("❌ PURCHASE WEBHOOK ERROR:", err);
+    throw err;
+  }
+}
+
+async function safeShopEmbedReply(interaction, embed) {
+  try {
+    if (interaction.deferred || interaction.replied) {
+      return await interaction.editReply({
+        content: "",
+        embeds: [embed]
+      });
+    }
+
+    return await interaction.reply({
+      embeds: [embed],
+      ephemeral: true
+    });
+  } catch (err) {
+    const msg = String(err?.message || err || "").toLowerCase();
+
+    if (
+      msg.includes("unknown message") ||
+      msg.includes("10008") ||
+      msg.includes("interaction has already been acknowledged")
+    ) {
+      try {
+        const channel =
+          interaction.channel ||
+          await interaction.guild?.channels
+            .fetch(interaction.channelId)
+            .catch(() => null);
+
+        if (channel?.isTextBased()) {
+          return await channel.send({
+            embeds: [embed],
+            allowedMentions: { repliedUser: false }
+          });
+        }
+      } catch (fallbackErr) {
+        console.error("❌ SHOP EMBED FALLBACK ERROR:", fallbackErr);
+      }
+    }
+
+    throw err;
+  }
+}
 
 async function safeShopReply(interaction, content) {
   try {
@@ -363,19 +432,48 @@ async function processNormalShopPurchase({ db, interaction, item, guildId, userI
 
   try {
     try {
-      await channel.send({
-        content:
-`🛒 **طلب شراء جديد**
+      const purchaseEmbed = new EmbedBuilder()
+        .setTitle("🛒 طلب شراء جديد")
+        .setDescription("تم استلام طلب شراء جديد ويحتاج إلى مراجعة الإدارة.")
+        .addFields(
+          {
+            name: "👤 العضو",
+            value: `<@${userId}>`,
+            inline: true
+          },
+          {
+            name: "🆔 معرف العضو",
+            value: userId,
+            inline: true
+          },
+          {
+            name: "📦 المنتج",
+            value: item.name,
+            inline: true
+          },
+          {
+            name: "💰 السعر",
+            value: `${item.price} 🪙`,
+            inline: true
+          },
+          {
+            name: "🟡 الحالة",
+            value: "قيد المراجعة",
+            inline: true
+          }
+        )
+        .setThumbnail(
+          interaction.user.displayAvatarURL({
+            extension: "png",
+            size: 256
+          })
+        )
+        .setFooter({
+          text: "Nexora • Purchases"
+        })
+        .setTimestamp();
 
-👤 العضو: <@${userId}>
-🆔 ID: ${userId}
-
-📦 المنتج: ${item.name}
-💰 السعر: ${item.price}
-
-🟡 الحالة: قيد المراجعة`,
-        components: [row]
-      });
+      await sendPurchaseWebhook(channel, purchaseEmbed, [row]);
 
       purchaseSent = true;
     } catch (sendErr) {
@@ -393,19 +491,11 @@ async function processNormalShopPurchase({ db, interaction, item, guildId, userI
         throw sendErr;
       }
 
-      await freshChannel.send({
-        content:
-`🛒 **طلب شراء جديد**
-
-👤 العضو: <@${userId}>
-🆔 ID: ${userId}
-
-📦 المنتج: ${item.name}
-💰 السعر: ${item.price}
-
-🟡 الحالة: قيد المراجعة`,
-        components: [row]
-      });
+      await sendPurchaseWebhook(
+        freshChannel,
+        purchaseEmbed,
+        [row]
+      );
 
       purchaseSent = true;
     }
@@ -477,15 +567,32 @@ async function processNormalShopPurchase({ db, interaction, item, guildId, userI
     console.error("❌ SHOP LOG ERROR:", err);
   });
 
-  return safeShopReply(
-    interaction,
-`✅ تم تسجيل طلبك بنجاح.
+  const buyerEmbed = new EmbedBuilder()
+    .setTitle("✅ تم تسجيل طلبك")
+    .setDescription("تم إنشاء طلب الشراء بنجاح، وهو الآن بانتظار مراجعة الإدارة.")
+    .addFields(
+      {
+        name: "📦 المنتج",
+        value: item.name,
+        inline: true
+      },
+      {
+        name: "💰 المبلغ المدفوع",
+        value: `${item.price} 🪙`,
+        inline: true
+      },
+      {
+        name: "🟡 الحالة",
+        value: "قيد المراجعة",
+        inline: true
+      }
+    )
+    .setFooter({
+      text: "Nexora • Shop"
+    })
+    .setTimestamp();
 
-📦 المنتج: ${item.name}
-💰 تم خصم: ${item.price} 🪙
-
-🟡 الطلب بانتظار مراجعة الإدارة.`
-  );
+  return safeShopEmbedReply(interaction, buyerEmbed);
 }
 
 if (interaction.isButton() && interaction.customId?.startsWith("buy_")) {
@@ -1226,15 +1333,46 @@ if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
         .catch(() => null);
 
       if (member) {
-        await member.send(
-`✅ **تم تسليم منتجك الذي اشتريته بنجاح**
+        const deliveryEmbed = new EmbedBuilder()
+          .setTitle("🎉 تم تسليم طلبك بنجاح")
+          .setDescription(
+            "تمت معالجة طلب الشراء الخاص بك وتسليم المنتج بنجاح. ❤️"
+          )
+          .addFields(
+            {
+              name: "📦 المنتج",
+              value: itemName,
+              inline: true
+            },
+            {
+              name: "💰 السعر",
+              value: `${price} 🪙`,
+              inline: true
+            },
+            {
+              name: "🏠 السيرفر",
+              value: guildName,
+              inline: false
+            },
+            {
+              name: "🟢 الحالة",
+              value: "تم التسليم",
+              inline: true
+            },
+            {
+              name: "👮 تمت المعالجة بواسطة",
+              value: `<@${interaction.user.id}>`,
+              inline: true
+            }
+          )
+          .setFooter({
+            text: "Nexora • Shop"
+          })
+          .setTimestamp();
 
-📦 المنتج: ${itemName}
-💰 السعر: ${price} 🪙
-🏠 السيرفر: ${guildName}
-
-شكراً لشرائك من متجرنا ❤️`
-        ).catch(err => {
+        await member.send({
+          embeds: [deliveryEmbed]
+        }).catch(err => {
           console.log("⚠️ تعذر إرسال DM للمشتري:", err.message);
         });
       }
@@ -1310,15 +1448,46 @@ if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
         .catch(() => null);
 
       if (member) {
-        await member.send(
-`❌ **تم إلغاء طلب الشراء الخاص بك**
+        const rejectEmbed = new EmbedBuilder()
+          .setTitle("❌ تم رفض طلب الشراء")
+          .setDescription(
+            "تم رفض طلب الشراء الخاص بك، وتمت إعادة النقاط إلى رصيدك بالكامل."
+          )
+          .addFields(
+            {
+              name: "📦 المنتج",
+              value: itemName,
+              inline: true
+            },
+            {
+              name: "💰 النقاط المُعادة",
+              value: `${price} 🪙`,
+              inline: true
+            },
+            {
+              name: "🏠 السيرفر",
+              value: guildName,
+              inline: false
+            },
+            {
+              name: "🔴 الحالة",
+              value: "تم الرفض",
+              inline: true
+            },
+            {
+              name: "👮 تمت المعالجة بواسطة",
+              value: `<@${interaction.user.id}>`,
+              inline: true
+            }
+          )
+          .setFooter({
+            text: "Nexora • Shop"
+          })
+          .setTimestamp();
 
-📦 المنتج: ${itemName}
-💰 تم إرجاع: ${price} 🪙
-🏠 السيرفر: ${guildName}
-
-تمت إعادة النقاط إلى رصيدك.`
-        ).catch(err => {
+        await member.send({
+          embeds: [rejectEmbed]
+        }).catch(err => {
           console.log("⚠️ تعذر إرسال DM للمشتري:", err.message);
         });
       }
@@ -1486,21 +1655,57 @@ if (interaction.isButton() && interaction.customId?.startsWith("deliver_")) {
           );
 
           try {
-            await channel.send({
-              content: `🛒 **طلب شراء جديد**
+            const purchaseEmbed = new EmbedBuilder()
+              .setTitle("🛒 طلب شراء جديد")
+              .setDescription("تم استلام طلب شراء جديد ويحتاج إلى مراجعة الإدارة.")
+              .addFields(
+                {
+                  name: "👤 العضو",
+                  value: `<@${userId}>`,
+                  inline: true
+                },
+                {
+                  name: "🆔 معرف العضو",
+                  value: userId,
+                  inline: true
+                },
+                {
+                  name: "📦 المنتج",
+                  value: item.name,
+                  inline: true
+                },
+                {
+                  name: "💰 السعر",
+                  value: `${item.price} 🪙`,
+                  inline: true
+                },
+                {
+                  name: `📝 ${item.input_name || "المعلومات"}`,
+                  value: userInput || "لا توجد",
+                  inline: false
+                },
+                {
+                  name: "🟡 الحالة",
+                  value: "قيد المراجعة",
+                  inline: true
+                }
+              )
+              .setThumbnail(
+                interaction.user.displayAvatarURL({
+                  extension: "png",
+                  size: 256
+                })
+              )
+              .setFooter({
+                text: "Nexora • Purchases"
+              })
+              .setTimestamp();
 
-👤 العضو: <@${userId}>
-🆔 ID: ${userId}
-
-📦 المنتج: ${item.name}
-💰 السعر: ${item.price}
-
-📝 ${item.input_name || "المعلومات"}:
-${userInput}
-
-🟡 الحالة: قيد المراجعة`,
-              components: [row]
-            });
+            await sendPurchaseWebhook(
+              channel,
+              purchaseEmbed,
+              [row]
+            );
           } catch (sendErr) {
             console.error(
               "⚠️ MODAL BUY CHANNEL SEND FAILED, RETRYING:",
@@ -1519,21 +1724,11 @@ ${userInput}
               throw sendErr;
             }
 
-            await freshChannel.send({
-              content: `🛒 **طلب شراء جديد**
-
-👤 العضو: <@${userId}>
-🆔 ID: ${userId}
-
-📦 المنتج: ${item.name}
-💰 السعر: ${item.price}
-
-📝 ${item.input_name || "المعلومات"}:
-${userInput}
-
-🟡 الحالة: قيد المراجعة`,
-              components: [row]
-            });
+            await sendPurchaseWebhook(
+              freshChannel,
+              purchaseEmbed,
+              [row]
+            );
           }
 
           await sendShopLog(interaction.guild, {
@@ -1575,17 +1770,37 @@ ${userInput}
             ]
           });
 
-          return interaction.editReply({
-            content:
-`✅ تم تسجيل طلبك
+          const buyerEmbed = new EmbedBuilder()
+            .setTitle("✅ تم تسجيل طلبك")
+            .setDescription("تم إنشاء طلب الشراء بنجاح، وهو الآن بانتظار مراجعة الإدارة.")
+            .addFields(
+              {
+                name: "📦 المنتج",
+                value: item.name,
+                inline: true
+              },
+              {
+                name: "💰 المبلغ المدفوع",
+                value: `${item.price} 🪙`,
+                inline: true
+              },
+              {
+                name: `📝 ${item.input_name || "المعلومات"}`,
+                value: userInput || "لا توجد",
+                inline: false
+              },
+              {
+                name: "🟡 الحالة",
+                value: "قيد المراجعة",
+                inline: true
+              }
+            )
+            .setFooter({
+              text: "Nexora • Shop"
+            })
+            .setTimestamp();
 
-📦 المنتج: ${item.name}
-💰 تم خصم: ${item.price} نقطة
-📝 ${item.input_name || "المعلومات"}: ${userInput}
-
-🟡 الطلب بانتظار مراجعة الإدارة.`,
-            ephemeral: true
-          });
+          return safeShopEmbedReply(interaction, buyerEmbed);
 
 
         }
