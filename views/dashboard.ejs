@@ -320,6 +320,61 @@ document.addEventListener("click", function(event) {
 </div>
 </form>
 
+<script>
+const settingsForm = document.querySelector('form[action="/dashboard/<%= guildId %>"]');
+
+if (settingsForm) {
+  settingsForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const button = settingsForm.querySelector(".save");
+    const originalText = button?.textContent;
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "⏳ جاري الحفظ...";
+    }
+
+    try {
+      const response = await fetch(settingsForm.action, {
+        method: "POST",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        body: new FormData(settingsForm)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "فشل حفظ الإعدادات");
+      }
+
+      if (button) {
+        button.textContent = data.message || "✅ تم الحفظ";
+      }
+
+      setTimeout(() => {
+        if (button) button.textContent = originalText;
+      }, 1500);
+
+    } catch (error) {
+      console.error("SETTINGS SAVE ERROR:", error);
+
+      if (button) {
+        button.textContent = "❌ فشل الحفظ";
+
+        setTimeout(() => {
+          button.textContent = originalText;
+        }, 2000);
+      }
+    } finally {
+      if (button) button.disabled = false;
+    }
+  });
+}
+</script>
+
 <hr>
 
 <div class="grid">

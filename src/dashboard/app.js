@@ -1,7 +1,6 @@
 const express = require("express");
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const db = require("../database/connect");
-const dashboardProtect = require("./protect");
 
 
 const COMMAND_DISPLAY_NAMES = {
@@ -18,663 +17,66 @@ const COMMAND_DISPLAY_NAMES = {
 };
 
 const app = express();
-app.use(require("./session"));
-app.use(require("./oauth"));
-
-function dashboardAuth(req, res, next) {
-  if (!req.session || !req.session.userId) {
-    return res.redirect("/auth/discord");
-  }
-
-  req.session.lastActivity = Date.now();
-
-  next();
-}
 
 
-app.use("/dashboard/:guildId", dashboardAuth, dashboardProtect);
-app.use("/settings/:guildId", dashboardAuth, dashboardProtect);
-app.use("/shop/:guildId", dashboardAuth, dashboardProtect);
+
 
 app.use(express.static("public"));
 app.use(express.urlencoded({ extended: true }));
 app.set("view engine", "ejs");
 app.set("views", "./views");
 
-const dashboardGuildCache = new Map();
-const DASHBOARD_GUILD_CACHE_MS = 5 * 60 * 1000;
-
-async function getDiscordUserGuilds(req) {
-  const userId = req.session?.userId;
-  const accessToken = req.session?.accessToken;
-
-  if (!userId || !accessToken) return [];
-
-  const cached = dashboardGuildCache.get(userId);
-
-  if (cached && Date.now() - cached.time < DASHBOARD_GUILD_CACHE_MS) {
-    return cached.guilds;
-  }
-
-  try {
-    const response = await fetch(
-      "https://discord.com/api/v10/users/@me/guilds",
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
-      }
-    );
-
-    if (!response.ok) {
-      if (cached) return cached.guilds;
-      return [];
-    }
-
-    const guilds = await response.json();
-
-    dashboardGuildCache.set(userId, {
-      time: Date.now(),
-      guilds
-    });
-
-    return guilds;
-  } catch (err) {
-    console.error("DISCORD GUILDS FETCH ERROR:", err);
-
-    if (cached) return cached.guilds;
-
-    return [];
-  }
-}
-async function checkDashboardGuildAccess(req, res, next) {
-  const guildId = req.params.guildId;
-
-  if (!req.session || !req.session.userId) {
-    return res.redirect("/auth/discord");
-  }
-
-  const userId = req.session.userId;
-
-  /*
-   * ⭐ Staff أولاً
-   *
-   * لا نعتمد على Discord OAuth guilds API
-   * لتحديد Staff لأن Staff محفوظ أصلًا في قاعدة البيانات.
-   * هذا يجعل دخول Staff للداشبورد أسرع وأكثر ثباتًا.
-   */
-  try {
-    const staff = await new Promise((resolve, reject) => {
-      db.get(
-        "SELECT * FROM staff WHERE guild_id=? AND user_id=?",
-        [guildId, userId],
-        (err, row) => {
-          if (err) return reject(err);
-          resolve(row);
-        }
-      );
-    });
-
-    if (staff) {
-      req.dashboardPermission = "staff";
-      req.dashboardCanEdit = true;
-
-      console.log(
-        "⭐ DASHBOARD STAFF ACCESS:",
-        userId,
-        "GUILD:",
-        guildId
-      );
-
-      return next();
-    }
-
-  } catch (err) {
-    console.error("DASHBOARD STAFF ACCESS ERROR:", err);
-
-    return res.status(500).send(
-      "❌ حدث خطأ أثناء التحقق من صلاحيات Staff."
-    );
-  }
-
-  /*
-   * إذا لم يكن Staff، نتحقق من Discord.
-   */
-  if (!req.session.accessToken) {
-    return res.redirect("/auth/discord");
-  }
-
-  try {
-    const guilds = await getDiscordUserGuilds(req);
-    const guild = guilds.find(g => g.id === guildId);
-
-    if (!guild) {
-      return res.status(403).send(
-        "❌ هذا السيرفر غير موجود ضمن سيرفرات حسابك."
-      );
-    }
-
-    const client = req.app.get("client");
-    const botGuild = client?.guilds.cache.get(guildId);
-
-    /*
-     * 👑 Owner
-     */
-    if (
-      guild.owner === true ||
-      (botGuild && botGuild.ownerId === userId)
-    ) {
-      req.dashboardPermission = "owner";
-      req.dashboardCanEdit = true;
-
-      return next();
-    }
-
-    /*
-     * 🛡️ Administrator بدون Staff
-     */
-    const permissions = BigInt(guild.permissions || "0");
-    const isAdministrator =
-      (permissions & 0x8n) === 0x8n;
-
-    if (isAdministrator) {
-      req.dashboardPermission = "administrator";
-      req.dashboardCanEdit = false;
-
-      return res.status(403).send(
-        "❌ Administrator يحتاج Staff أو Owner لتعديل لوحة التحكم."
-      );
-    }
-
-    req.dashboardPermission = "member";
-    req.dashboardCanEdit = false;
-
-    return res.status(403).send(
-      "❌ ليس لديك صلاحية تعديل لوحة التحكم."
-    );
-
-  } catch (err) {
-    console.error("DASHBOARD ACCESS ERROR:", err);
-
-    return res.status(500).send(
-      "❌ حدث خطأ أثناء التحقق من صلاحيات السيرفر."
-    );
-  }
+function checkDashboardGuildAccess(req, res, next) {
+  req.dashboardPermission = "public";
+  req.dashboardCanEdit = true;
+  return next();
 }
 
-app.get("/", async (req, res) => {
-  if (!req.session || !req.session.userId || !req.session.accessToken) {
-    return res.redirect("/login");
-  }
-
-  try {
-    const response = await fetch(
-      "https://discord.com/api/v10/users/@me/guilds",
-      {
-        headers: {
-          Authorization: `Bearer ${req.session.accessToken}`
+app.get("/", (req, res) => {
+  return res.send(`
+    <!DOCTYPE html>
+    <html lang="ar" dir="rtl">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Nexora Dashboard</title>
+      <style>
+        body {
+          margin: 0;
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #090d18;
+          color: #fff;
+          font-family: Arial, sans-serif;
+          text-align: center;
         }
-      }
-    );
-
-    if (!response.ok) {
-      return res.status(401).send(
-        "❌ انتهت جلسة Discord، سجل الدخول مرة ثانية."
-      );
-    }
-
-    const guilds = await response.json();
-    const client = app.get("client");
-    const userId = req.session.userId;
-
-    // ⚡ جلب Staff للمستخدم باستعلام واحد بدل استعلام لكل سيرفر
-    const staffGuildIds = new Set();
-
-    try {
-      const staffRows = await new Promise((resolve, reject) => {
-        db.all(
-          "SELECT guild_id FROM staff WHERE user_id=?",
-          [userId],
-          (err, rows) => {
-            if (err) return reject(err);
-            resolve(rows || []);
-          }
-        );
-      });
-
-      for (const row of staffRows) {
-        staffGuildIds.add(String(row.guild_id));
-      }
-    } catch (err) {
-      console.error("STAFF BULK CHECK ERROR:", err);
-    }
-
-    const guildData = guilds.map(guild => {
-      const botGuild = client?.guilds.cache.get(guild.id);
-
-      const isStaff = staffGuildIds.has(String(guild.id));
-
-      const isOwner =
-        guild.owner === true ||
-        (botGuild && botGuild.ownerId === userId);
-
-      const permissions = BigInt(guild.permissions || "0");
-      const isAdministrator =
-        (permissions & 0x8n) === 0x8n;
-
-      const canEdit = isOwner || isStaff;
-      const canView = isOwner || isStaff || isAdministrator;
-
-      let roleLabel = "👤 عضو";
-      let roleClass = "member";
-
-      if (isOwner) {
-        roleLabel = "👑 Owner";
-        roleClass = "owner";
-      } else if (isStaff) {
-        roleLabel = "⭐ Staff";
-        roleClass = "staff";
-      } else if (isAdministrator) {
-        roleLabel = "🛡️ Administrator";
-        roleClass = "admin";
-      }
-
-      const icon = guild.icon
-        ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png?size=128`
-        : "https://cdn.discordapp.com/embed/avatars/0.png";
-
-      let action = "";
-
-      if (!botGuild) {
-        const inviteUrl =
-          `https://discord.com/oauth2/authorize?client_id=${process.env.CLIENT_ID}` +
-          `&scope=bot%20applications.commands` +
-          `&permissions=8` +
-          `&guild_id=${guild.id}`;
-
-        action = `
-          <a class="guild-action add"
-             href="${inviteUrl}">
-            <span>＋</span>
-            إضافة البوت
-          </a>
-        `;
-      } else if (canEdit) {
-        action = `
-          <a class="guild-action open"
-             href="/dashboard/${guild.id}">
-            فتح لوحة التحكم
-            <span>←</span>
-          </a>
-        `;
-      } else {
-        action = `
-          <div class="guild-action disabled">
-            🔒 ليس لديك صلاحية التعديل
-          </div>
-        `;
-      }
-
-      return {
-        name: guild.name,
-        icon,
-        roleLabel,
-        roleClass,
-        botGuild: !!botGuild,
-        canEdit,
-        canView,
-        action
-      };
-    });
-    const manageableGuildData = guildData.filter(guild =>
-      guild.canView
-    );
-
-    const cards = manageableGuildData.map(guild => `
-      <div class="guild-card">
-
-        <div class="guild-top">
-
-          <img
-            class="guild-icon"
-            src="${guild.icon}"
-            alt=""
-          >
-
-          <div class="guild-info">
-            <h3>${guild.name}</h3>
-
-            <span class="permission ${guild.roleClass}">
-              ${guild.roleLabel}
-            </span>
-          </div>
-
-        </div>
-
-        <div class="guild-status">
-          ${
-            guild.botGuild
-              ? `<span class="online">● البوت موجود في السيرفر</span>`
-              : `<span class="offline">● البوت غير موجود في السيرفر</span>`
-          }
-        </div>
-
-        ${guild.action}
-
+        .box {
+          padding: 30px;
+        }
+        a {
+          display: inline-block;
+          margin-top: 15px;
+          padding: 12px 22px;
+          border-radius: 10px;
+          background: #5865f2;
+          color: #fff;
+          text-decoration: none;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="box">
+        <h1>⚡ Nexora Dashboard</h1>
+        <p>لوحة التحكم مفتوحة مباشرة عبر رابط السيرفر.</p>
       </div>
-    `).join("");
-
-    res.send(`
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-
-<head>
-
-<meta charset="UTF-8">
-
-<meta name="viewport"
-      content="width=device-width, initial-scale=1.0">
-
-<title>Nexora • السيرفرات</title>
-
-<style>
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  min-height: 100vh;
-  font-family: Arial, sans-serif;
-  background:
-    radial-gradient(circle at top right, #293b83 0, transparent 35%),
-    radial-gradient(circle at bottom left, #3c1e69 0, transparent 35%),
-    #090d18;
-  color: #fff;
-}
-
-.container {
-  width: min(1200px, 94%);
-  margin: auto;
-  padding: 45px 0 60px;
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 35px;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.logo {
-  width: 58px;
-  height: 58px;
-  border-radius: 18px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, #5865f2, #8b5cf6);
-  font-size: 28px;
-  box-shadow: 0 12px 35px rgba(88,101,242,.35);
-}
-
-.brand h1 {
-  margin: 0;
-  font-size: 25px;
-}
-
-.brand p {
-  margin: 5px 0 0;
-  color: #9ca3b8;
-}
-
-.logout {
-  text-decoration: none;
-  color: #cbd5e1;
-  padding: 11px 16px;
-  border: 1px solid #27304a;
-  border-radius: 12px;
-  background: rgba(15,20,35,.7);
-}
-
-.hero {
-  margin-bottom: 28px;
-}
-
-.hero h2 {
-  margin: 0 0 8px;
-  font-size: 32px;
-}
-
-.hero p {
-  margin: 0;
-  color: #9ca3b8;
-}
-
-.guild-grid {
-  display: grid;
-  grid-template-columns:
-    repeat(auto-fill, minmax(280px, 1fr));
-  gap: 18px;
-}
-
-.guild-card {
-  padding: 20px;
-  border-radius: 22px;
-  background: rgba(17,23,40,.86);
-  border: 1px solid #252d46;
-  box-shadow: 0 18px 45px rgba(0,0,0,.2);
-  transition: transform .2s ease,
-              border-color .2s ease,
-              box-shadow .2s ease;
-}
-
-.guild-card:hover {
-  transform: translateY(-4px);
-  border-color: #5865f2;
-  box-shadow: 0 22px 55px rgba(0,0,0,.3);
-}
-
-.guild-top {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.guild-icon {
-  width: 68px;
-  height: 68px;
-  border-radius: 20px;
-  object-fit: cover;
-}
-
-.guild-info {
-  min-width: 0;
-}
-
-.guild-info h3 {
-  margin: 0 0 9px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.permission {
-  display: inline-block;
-  padding: 5px 9px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: bold;
-}
-
-.permission.owner {
-  background: rgba(245,158,11,.15);
-  color: #fbbf24;
-}
-
-.permission.staff {
-  background: rgba(139,92,246,.15);
-  color: #a78bfa;
-}
-
-.permission.admin {
-  background: rgba(59,130,246,.15);
-  color: #60a5fa;
-}
-
-.permission.member {
-  background: rgba(148,163,184,.12);
-  color: #94a3b8;
-}
-
-.guild-status {
-  margin: 20px 0 15px;
-  color: #9ca3b8;
-  font-size: 13px;
-}
-
-.online {
-  color: #4ade80;
-}
-
-.offline {
-  color: #f87171;
-}
-
-.guild-action {
-  width: 100%;
-  min-height: 45px;
-  border-radius: 13px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  text-decoration: none;
-  font-weight: bold;
-}
-
-.guild-action.open {
-  background: linear-gradient(135deg, #5865f2, #7c3aed);
-  color: white;
-}
-
-.guild-action.add {
-  background: linear-gradient(135deg, #16a34a, #22c55e);
-  color: white;
-}
-
-.guild-action.disabled {
-  background: #171d2d;
-  border: 1px solid #2a334c;
-  color: #6b7280;
-  cursor: not-allowed;
-}
-
-.empty {
-  padding: 45px;
-  text-align: center;
-  border: 1px dashed #303952;
-  border-radius: 20px;
-  color: #9ca3b8;
-}
-
-@media(max-width:600px) {
-
-  .container {
-    padding-top: 25px;
-  }
-
-  .header {
-    align-items: flex-start;
-  }
-
-  .logout {
-    font-size: 12px;
-  }
-
-  .hero h2 {
-    font-size: 25px;
-  }
-
-}
-
-</style>
-
-</head>
-
-<body>
-
-<div class="container">
-
-  <header class="header">
-
-    <div class="brand">
-
-      <div class="logo">
-  <img src="https://i.ibb.co/21NMDT7Z/nexora.png"
-       alt="Nexora"
-       style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">
-</div>
-
-      <div>
-        <h1>Nexora</h1>
-        <p>
-          مرحباً ${req.session.username || "بك"}
-        </p>
-      </div>
-
-    </div>
-
-    <a class="logout" href="/logout">
-      🚪 تسجيل الخروج
-    </a>
-
-  </header>
-
-  <section class="hero">
-
-    <h2>السيرفرات</h2>
-
-    <p>
-      اختر السيرفر الذي تريد إدارة Nexora فيه
-    </p>
-
-  </section>
-
-  ${
-    cards
-      ? `<div class="guild-grid">${cards}</div>`
-      : `
-        <div class="empty">
-          ❌ لا توجد سيرفرات متاحة في حسابك.
-        </div>
-      `
-  }
-
-</div>
-
-</body>
-
-</html>
-    `);
-
-  } catch (err) {
-    console.error("GUILDS PAGE ERROR:", err);
-
-    return res.status(500).send(
-      "❌ حدث خطأ أثناء جلب السيرفرات."
-    );
-  }
+    </body>
+    </html>
+  `);
 });
 
-app.get("/settings/:guildId", dashboardAuth, checkDashboardGuildAccess, (req, res) => {
+app.get("/settings/:guildId", checkDashboardGuildAccess, (req, res) => {
   const guildId = req.params.guildId;
 
   db.get(
@@ -762,7 +164,6 @@ app.post("/settings/:guildId", (req, res) => {
 
 app.get(
   "/dashboard/:guildId/commands",
-  dashboardAuth,
   checkDashboardGuildAccess,
   async (req, res) => {
 
@@ -893,7 +294,7 @@ app.get(
   }
 );
 
-app.post("/dashboard/:guildId/commands", dashboardAuth, checkDashboardGuildAccess, async (req, res) => {
+app.post("/dashboard/:guildId/commands", checkDashboardGuildAccess, async (req, res) => {
   try {
 
     const guildId = req.params.guildId;
@@ -927,7 +328,7 @@ app.post("/dashboard/:guildId/commands", dashboardAuth, checkDashboardGuildAcces
 });
 
 
-app.post("/dashboard/:guildId/commands/settings", dashboardAuth, checkDashboardGuildAccess, async(req, res) => {
+app.post("/dashboard/:guildId/commands/settings", checkDashboardGuildAccess, async(req, res) => {
   try {
     const guildId = req.params.guildId;
 
@@ -1051,7 +452,7 @@ app.post("/dashboard/:guildId/commands/settings", dashboardAuth, checkDashboardG
   }
 });
 
-app.post("/dashboard/:guildId/commands/delete/:id", dashboardAuth, checkDashboardGuildAccess, async (req, res) => {
+app.post("/dashboard/:guildId/commands/delete/:id", checkDashboardGuildAccess, async (req, res) => {
   try {
 
     const guildId = req.params.guildId;
@@ -1080,7 +481,7 @@ function escapeHtml(value) {
 }
 
 
-app.get("/dashboard/:guildId", dashboardAuth, checkDashboardGuildAccess, async (req, res) => {
+app.get("/dashboard/:guildId", checkDashboardGuildAccess, async (req, res) => {
   const dashboardTimer = Date.now();
   const guildId = req.params.guildId;
   const client = req.app.get("client");
@@ -1123,67 +524,22 @@ app.get("/dashboard/:guildId", dashboardAuth, checkDashboardGuildAccess, async (
     console.log(`⏱️ ROLES+CHANNELS: ${Date.now() - dashboardTimer}ms`);
 
     /*
-     * السيرفرات التي يستطيع المستخدم رؤيتها.
-     *
-     * getDiscordUserGuilds فيها Cache لمدة 60 ثانية،
-     * لذلك لن نطلب Discord في كل تحميل للداشبورد.
+     * الداشبورد مفتوح بالرابط مباشرة.
+     * لا نعتمد على Discord OAuth أو Session لتحديد السيرفرات.
      */
-    const discordGuilds = await getDiscordUserGuilds(req);
-
-    console.log("🔎 DISCORD GUILDS COUNT:", discordGuilds.length);
-
-    /*
-     * بدل db.get لكل سيرفر:
-     * نجلب Staff الخاص بالمستخدم مرة واحدة فقط.
-     */
-    const staffRows = await db.all(
-      "SELECT guild_id FROM staff WHERE user_id=?",
-      [req.session.userId]
-    );
-
-    const staffGuilds = new Set(
-      (staffRows || []).map(row => String(row.guild_id))
-    );
-
-    const manageableGuilds = [];
-
-    for (const g of discordGuilds) {
-      const isOwner = g.owner === true;
-
-      const permissions = BigInt(g.permissions || "0");
-      const isAdministrator =
-        (permissions & 0x8n) === 0x8n;
-
-      const isStaff = staffGuilds.has(String(g.id));
-
-      const canView =
-        isOwner ||
-        isAdministrator ||
-        isStaff;
-
-      if (!canView) {
-        continue;
-      }
-
-      const canEdit =
-        isOwner ||
-        isStaff;
-
-      const botGuild = client.guilds.cache.get(g.id);
-
-      manageableGuilds.push({
-        id: g.id,
-        name: g.name,
-        icon: g.icon
-          ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=128`
-          : "https://cdn.discordapp.com/embed/avatars/0.png",
-        owner: isOwner,
-        staff: isStaff,
-        administrator: isAdministrator,
-        canEdit,
-        botInstalled: !!botGuild
-      });
-    }
+    const manageableGuilds = [{
+      id: guild.id,
+      name: guild.name,
+      icon: guild.iconURL({
+        size: 128,
+        extension: "png"
+      }),
+      owner: false,
+      staff: false,
+      administrator: false,
+      canEdit: true,
+      botInstalled: true
+    }];
 
     /*
      * جميع بيانات الداشبورد المستقلة يتم جلبها بالتوازي.
@@ -1288,7 +644,7 @@ app.get("/dashboard/:guildId", dashboardAuth, checkDashboardGuildAccess, async (
   }
 });
 
-app.get("/shop/:guildId", dashboardAuth, checkDashboardGuildAccess, (req,res)=>{
+app.get("/shop/:guildId", checkDashboardGuildAccess, (req,res)=>{
   const guildId = req.params.guildId;
 
   db.all(
@@ -1446,6 +802,13 @@ app.post("/dashboard/:guildId", async (req, res) => {
       );
     }
 
+    if (req.headers["x-requested-with"] === "XMLHttpRequest") {
+      return res.json({
+        success: true,
+        message: "✅ تم حفظ الإعدادات بنجاح"
+      });
+    }
+
     return res.redirect(
       "/dashboard/" + guildId
     );
@@ -1544,7 +907,7 @@ app.get("/dashboard/:guildId/shop/edit/:id", (req,res)=>{
 });
 
 
-app.post("/dashboard/:guildId/shop/edit/:id", dashboardAuth, checkDashboardGuildAccess, (req,res)=>{
+app.post("/dashboard/:guildId/shop/edit/:id", checkDashboardGuildAccess, (req,res)=>{
   const guildId = req.params.guildId;
   const id = req.params.id;
 
@@ -1592,22 +955,8 @@ app.post("/dashboard/:guildId/shop/edit/:id", dashboardAuth, checkDashboardGuild
   );
 });
 
-app.get("/login", (req, res) => {
-  if (req.session && req.session.userId) {
-    return res.redirect("/");
-  }
 
-  return res.redirect("/auth/discord");
-});
-
-app.get("/logout",(req,res)=>{
-  req.session.destroy(()=>{
-    res.send("✅ تم تسجيل الخروج");
-  });
-});
-
-
-app.get("/dashboard/:guildId/giveaways", dashboardAuth, checkDashboardGuildAccess, (req, res) => {
+app.get("/dashboard/:guildId/giveaways", checkDashboardGuildAccess, (req, res) => {
 
   const guildId = req.params.guildId;
 
@@ -1643,7 +992,7 @@ app.get("/dashboard/:guildId/giveaways", dashboardAuth, checkDashboardGuildAcces
 
 const creatingGiveaways = new Set();
 
-app.post("/dashboard/:guildId/giveaways", dashboardAuth, checkDashboardGuildAccess, (req,res)=>{
+app.post("/dashboard/:guildId/giveaways", checkDashboardGuildAccess, (req,res)=>{
 
   const guildId = req.params.guildId;
 
@@ -1673,12 +1022,7 @@ app.post("/dashboard/:guildId/giveaways", dashboardAuth, checkDashboardGuildAcce
     return res.status(400).send("❌ موعد السحب غير صالح");
   }
 
-  const createdBy =
-    req.user?.id ||
-    req.session?.user?.id ||
-    req.session?.userId ||
-    req.session?.discordUserId ||
-    "dashboard";
+  const createdBy = "dashboard";
 
   db.run(
     `INSERT INTO giveaways
@@ -1823,7 +1167,7 @@ app.post("/dashboard/:guildId/giveaways", dashboardAuth, checkDashboardGuildAcce
   );
 
 });
-app.get("/dashboard/:guildId/giveaways/delete/:id", dashboardAuth, checkDashboardGuildAccess, (req,res)=>{
+app.get("/dashboard/:guildId/giveaways/delete/:id", checkDashboardGuildAccess, (req,res)=>{
  const client = req.app.get("client");
  console.log("DELETE GIVEAWAY:", req.params);
 
@@ -1840,7 +1184,7 @@ app.get("/dashboard/:guildId/giveaways/delete/:id", dashboardAuth, checkDashboar
 });
 
 
-app.post("/dashboard/:guildId/giveaways/edit/:id", dashboardAuth, checkDashboardGuildAccess, (req,res)=>{
+app.post("/dashboard/:guildId/giveaways/edit/:id", checkDashboardGuildAccess, (req,res)=>{
 
   const { guildId, id } = req.params;
 
@@ -1892,7 +1236,7 @@ app.post("/dashboard/:guildId/giveaways/edit/:id", dashboardAuth, checkDashboard
 });
 
 
-app.get("/dashboard/:guildId/giveaways/reroll/:id", dashboardAuth, checkDashboardGuildAccess, async (req, res) => {
+app.get("/dashboard/:guildId/giveaways/reroll/:id", checkDashboardGuildAccess, async (req, res) => {
 
   const { guildId, id } = req.params;
   const client = req.app.get("client");
